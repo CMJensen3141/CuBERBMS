@@ -14,13 +14,13 @@ import numpy as np
 class RFB_FD_ThermalModel: 
     def __init__(self,Rstack,Tsample):
         self.Rstack = Rstack
-        self.Vstack = 0.02 # Stack volume in m^3
-        self.Vtanks = 1 # Tank volumes (assumed equal) in m^3
-        self.T_air = 40 # Ambient temperature
+        self.Vstack = 0.01 # Stack volume in m^3
+        self.Vtanks = 0.1 # Tank volumes (assumed equal) in m^3
+        self.T_air = 25 # Ambient temperature
         self.T_a = self.T_air  # Anolyte temperature
         self.T_c = self.T_air  # Catholyte temperature
         self.T_s = self.T_air  # Stack temperature
-        # self.rho = 1.354 # Electrolyte density in g/cm3
+        # self.rho = 1.354 # Electrolyte density in g/cm3 
         self.rho = 1354000 # Electrolyte density in g/m^3
         self.Cp = 3.2 # Specific heat capacity of electrolyte, J/(g*K)^-1
         self.As = 6 # Surface area of each tank assuming cube shape
@@ -47,15 +47,14 @@ class RFB_FD_ThermalModel:
 
 import numpy as np
 import matplotlib.pyplot as plt
-import RFB_FlowThermalModel as RFBFTM
 
 literstocubic = 1.66666667*10**-5
-Ts = 1
+Ts = 0.05
 
 
-fooMod = RFBFTM.RFB_FD_ThermalModel(0.073,Ts)
+fooMod = RFB_FD_ThermalModel(0.35,Ts)
 
-simtime = 48 # Simulation time in hours
+simtime = 12 # Simulation time in hours
 
 simlen = round((simtime*3600)/Ts) 
 
@@ -63,8 +62,8 @@ Tstack = np.empty([simlen,1])
 Tano = np.empty([simlen,1])
 Tcat = np.empty([simlen,1])
 
-flow1 = 1*literstocubic
-flow2 = 1*literstocubic
+flow1 = 2*literstocubic
+flow2 = 20*literstocubic
 
 for ii in range(0,simlen):
     Tvec = fooMod.GetTemps()
@@ -76,7 +75,9 @@ for ii in range(0,simlen):
     else:
         fooMod.ModelTimestep(flow2,flow2,-100)
         
-taxis = np.linspace(0,simtime,round(simlen/Ts))
+taxis = np.linspace(0,simtime,simlen)
+
+#%%
         
 plt.figure()
 plt.plot(taxis,Tstack,'b--')

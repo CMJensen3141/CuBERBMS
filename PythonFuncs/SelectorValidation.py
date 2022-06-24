@@ -9,6 +9,27 @@ import numpy as np
 import RFB_GraphHydraulicModel as GRFMOD
 import RFB_FlowThermalModel as RFBFTM
 import matplotlib.pyplot as plt
+import CuBMS as CB
+
+
+# BMS parametre
+BMS_mu     = 0.1 #Step size i RLS estimator
+BMS_Lambda = 0.9999 #Forgetting factor in RLS
+BMS_EstMode = 1   # Estimator mode for RLS estimator - 0 for differential measurements, 1 for direct
+
+
+# Kp,Ki,Kd,beta,gamma,MV_init,Lim_max,Lim_min,I_max,I_min,I_tog,PumpMax,PumpMin
+BMS_Lim_max = 2500 # Maximum limit (power)
+BMS_Lim_min = -2500# Minimum limit (power)
+BMS_I_max   = 150  # Maximum limit (current)
+BMS_I_min   = -150 # Minimum limit (current)
+BMS_I_tog   = 50   # Pump current threshold / toggle
+BMS_PumpMax = 2    # Flow in [m^3/h]
+BMS_PumpMin = 0.0  # Flow in [m^3/h]
+
+myBMS = CB.CuBMS(BMS_Lim_max, BMS_Lim_min, BMS_I_max, BMS_I_min, BMS_I_tog, BMS_PumpMax, BMS_PumpMin,BMS_EstMode)
+
+
 Ts = 0.01
 
 fooMod = RFBFTM.RFB_FD_ThermalModel(0.073,Ts)

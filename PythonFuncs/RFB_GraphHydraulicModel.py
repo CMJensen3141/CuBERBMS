@@ -56,37 +56,36 @@ class GraphHydraulicModel:
     def GetVals(self):
         return self.q, self.dP
 
-#%% Test that class works correctly
+# %% Test that class works correctly
 
-import RFB_GraphHydraulicModel as GRFMOD
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
-fooMod = GRFMOD.GraphHydraulicModel(0.01)
+# fooMod = GraphHydraulicModel(0.05)
 
-simlen = round(10/fooMod.Ts)
+# simlen = round(3600/fooMod.Ts)
 
-qvec = np.empty([5,simlen])
-pvec = np.empty([5,simlen])
-vals = np.empty([5])
+# qvec = np.empty([5,simlen])
+# pvec = np.empty([5,simlen])
+# vals = np.empty([5])
 
 
-for ii in range(0,simlen):
-    vals = fooMod.GetVals()
-    qvec[:,ii] = 16.7*vals[0].flatten()
-    pvec[:,ii] = 1000*vals[1].flatten()
-    if ii > simlen/2:
-        fooMod.TimeStep(fooMod.q,0)
-    elif ii > simlen/4:
-        fooMod.TimeStep(fooMod.q,50)
-    else:
-        fooMod.TimeStep(fooMod.q,100)
+# for ii in range(0,simlen):
+#     vals = fooMod.GetVals()
+#     qvec[:,ii] = 16.7*vals[0].flatten()
+#     pvec[:,ii] = 1000*vals[1].flatten()
+#     if ii > simlen/2:
+#         fooMod.TimeStep(fooMod.q,0)
+#     elif ii > simlen/4:
+#         fooMod.TimeStep(fooMod.q,50)
+#     else:
+#         fooMod.TimeStep(fooMod.q,100)
        
-plt.figure()
-for ii in range(0,5):
-    plt.plot(qvec[ii,:],'--')
-plt.legend(['Pipe 1','Stack','Pipe 2','Pipe 3','Pump'])   
+# plt.figure()
+# for ii in range(0,5):
+#     plt.plot(qvec[ii,:],'--')
+# plt.legend(['Pipe 1','Stack','Pipe 2','Pipe 3','Pump'])   
 
-plt.figure()
-for ii in range(0,5):
-    plt.plot(pvec[ii,:],'--')
-plt.legend(['Pipe 1','Stack','Pipe 2','Pipe 3','Pump'])     
+# plt.figure()
+# for ii in range(0,5):
+#     plt.plot(pvec[ii,:],'--')
+# plt.legend(['Pipe 1','Stack','Pipe 2','Pipe 3','Pump'])     
