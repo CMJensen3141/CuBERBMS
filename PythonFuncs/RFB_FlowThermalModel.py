@@ -44,7 +44,6 @@ class RFB_FD_ThermalModel:
         return self.T_s, self.T_a, self.T_c
 
 
-3#%% 
 
 import numpy as np
 import matplotlib.pyplot as plt
