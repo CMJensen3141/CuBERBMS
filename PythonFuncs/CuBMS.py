@@ -15,12 +15,12 @@ BMS_IDLE = 0;
 
 class CuBMS:
     def __init__(self,P_max,P_min,I_max,I_min,I_tog,PumpMax,PumpMin,EstMode):
-        self.MinTempController = CF.PID(0.01,0.05,0,0,0.1,0)
-        self.MaxTempController = CF.PID(0.01,0.05,0,0,0.1,0)
-        self.MinPressureController = CF.PID(1e-3,1e-5,0,0,0.1,0)
-        self.MaxPressureController = CF.PID(1e-3,1e-5,0,0,0.1,0)
+        self.FFController = CF.PID(0.1,0.01,0,0,0.1,0)
+        self.MinTempController = CF.PID(0.5,0.1,0,0,0.1,0)
+        self.MaxTempController = CF.PID(0.5,0.1,0,0,0.1,0)
+        self.MinPressureController = CF.PID(0.1,0.01,0,0,0.1,0)
+        self.MaxPressureController = CF.PID(0.1,0.01,0,0,0.1,0)
         self.InvRefPID = CF.PID(0.01, 0.0001, 0, 0.0, 0.1, 0)
-#        self.InvRefPID = CF.PID(0.01, 0.0005, 0, 0.0, 0.1, 0)
         mu = 1 # Estimator gain
         L = 0.99 # Estimator forgetting factor
         self.RLSEstimator = CF.CM_RLS(mu, L, 3, 100,EstMode)
@@ -44,12 +44,14 @@ class CuBMS:
         self.SOC = 1 # Measured/estimated state of charge
         
         self.dP_meas = 0 # Measured stack differential pressure
-        self.dP_ub = 500 # Upper bound on stack differential pressure, millibars
-        self.dP_lb = 0 # Lower bound on stack differential pressure
+        self.dP_ub = 150 # Upper bound on stack differential pressure, millibars
+        self.dP_lb = -150 # Lower bound on stack differential pressure
         
-        self.T_meas = 0 # Measured stack temperature
+        self.T_meas = 25 # Measured stack temperature
         self.T_ub = 60 # Upper bound on stack temperature
         self.T_lb = 50 # Lower bound on stack temperature
+        
+        self.q_meas = 0 # Measured flowrate
         
         self.Mode = 0 # Charging mode. 0 = rest, -1 = discharge, 1 = charge
         self.t = 0 # Current time
@@ -123,21 +125,23 @@ def calcPumpRef(self):
         
         if self.Mode == 1: # Charging
             Feedforward = self.FF*(self.N*self.I_meas)/(self.F*(1-self.SOC+0.01)*self.FormC) # Feedforward part = optimal flow rate, charging
+            u_FF = self.FFController.run(self.t,Feedforward,self.q_meas,self.PumpRef)
             u_pmin = self.MinPressureController.run(self.t,self.dP_lb,self.dP_meas,self.PumpRef)
             u_pmax = self.MaxPressureController.run(self.t,self.dP_ub,self.dP_meas,self.PumpRef)
-            u_tmin = self.MinTempController.run(self.t,self.T_lb,self.dP_meas,self.PumpRef)
-            u_tmax = self.MaxTempController.run(self.t,self.T_ub,self.dP_meas,self.PumpRef)
-            # u_min = max(u_min,0)
-            # u_max = max(u_max,0)
-            MaxPart = max(Feedforward,u_pmin,u_tmin)
+            u_tmin = -self.MinTempController.run(self.t,self.T_lb,self.T_meas,self.PumpRef)
+            u_tmax = -self.MaxTempController.run(self.t,self.T_ub,self.T_meas,self.PumpRef)
+            # u_pmin = max(u_pmin,0)
+            # u_pmax = max(u_pmax,0)
+            MaxPart = max(u_FF,u_pmin,u_tmin)
             self.PumpRef = min(MaxPart,u_pmax,u_tmax)
                 
         elif self.Mode == -1 or self.Mode == 0: # Discharging
             Feedforward = self.FF*(self.N*np.abs(self.I_meas))/(self.F*(self.SOC+0.01)*self.FormC) # Feedforward part = optimal flow rate, discharging
+            u_FF = self.FFController.run(self.t,Feedforward,self.q_meas,self.PumpRef)
             u_pmin = self.MinPressureController.run(self.t,self.dP_lb,self.dP_meas,self.PumpRef)
             u_pmax = self.MaxPressureController.run(self.t,self.dP_ub,self.dP_meas,self.PumpRef)
-            u_tmin = self.MinTempController.run(self.t,self.T_lb,self.dP_meas,self.PumpRef)
-            u_tmax = self.MaxTempControllerController.run(self.t,self.T_ub,self.dP_meas,self.PumpRef)
+            u_tmin = -self.MinTempController.run(self.t,self.T_lb,self.T_meas,self.PumpRef)
+            u_tmax = -self.MaxTempController.run(self.t,self.T_ub,self.T_meas,self.PumpRef)
             # u_min = max(u_min,0)
             # u_max = max(u_max,0)
             MaxPart = max(Feedforward,u_pmin,u_tmin)
@@ -215,23 +219,39 @@ def setSOC(self,SOC):
     
 def getSOC(self):
     return self.SOC
+    
+def setFlow(self,q):
+    self.q_meas = q
+    
+def getFlow(self):
+    return self.q_meas
+    
+def setTemp(self,T):
+    self.T_meas = T    
+
+def getTemp(self):
+    return self.T_meas
         
 def updateTime(self):
     self.t += self.dt
     
 def setTime(self,t):
     self.t = t
+    
 def setUMax(self,u_max):
     self.U_max
+    
 def setUMin(self,u_min):
     self.U_min
 
-def setMeasurements(self,current,voltage,power,dP,SOC):
+def setMeasurements(self,current,voltage,power,dP,SOC,T,q):
     setCurrent(self,current)
     setVoltage(self,voltage)
     setPower(self,power)
     setPressure(self,dP)
     setSOC(self,SOC)
+    setFlow(self,q)
+    setTemp(self,T)
     updateTime(self)
     
 

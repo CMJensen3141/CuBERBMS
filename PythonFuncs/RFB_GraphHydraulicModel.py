@@ -58,34 +58,43 @@ class GraphHydraulicModel:
 
 # %% Test that class works correctly
 
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
-# fooMod = GraphHydraulicModel(0.05)
+fooMod = GraphHydraulicModel(0.05)
 
-# simlen = round(3600/fooMod.Ts)
+simtime = 1
 
-# qvec = np.empty([5,simlen])
-# pvec = np.empty([5,simlen])
-# vals = np.empty([5])
+simlen = round(simtime*3600/fooMod.Ts)
+taxis = np.linspace(0,simtime,simlen)
+
+qvec = np.empty([5,simlen])
+pvec = np.empty([5,simlen])
+vals = np.empty([5])
 
 
-# for ii in range(0,simlen):
-#     vals = fooMod.GetVals()
-#     qvec[:,ii] = 16.7*vals[0].flatten()
-#     pvec[:,ii] = 1000*vals[1].flatten()
-#     if ii > simlen/2:
-#         fooMod.TimeStep(fooMod.q,0)
-#     elif ii > simlen/4:
-#         fooMod.TimeStep(fooMod.q,50)
-#     else:
-#         fooMod.TimeStep(fooMod.q,100)
+for ii in range(0,simlen):
+    vals = fooMod.GetVals()
+    qvec[:,ii] = 16.7*vals[0].flatten()
+    pvec[:,ii] = 1000*vals[1].flatten()
+    if ii > simlen/2:
+        fooMod.TimeStep(fooMod.q,100)
+    elif ii > simlen/4:
+        fooMod.TimeStep(fooMod.q,50)
+    else:
+        fooMod.TimeStep(fooMod.q,0)
        
+#%% 
+        
 # plt.figure()
 # for ii in range(0,5):
-#     plt.plot(qvec[ii,:],'--')
+#     plt.plot(taxis,qvec[ii,:],'--')
 # plt.legend(['Pipe 1','Stack','Pipe 2','Pipe 3','Pump'])   
+# plt.xlabel('Time [hr]')
+# plt.ylabel('Flow [l/min]')
 
 # plt.figure()
 # for ii in range(0,5):
-#     plt.plot(pvec[ii,:],'--')
-# plt.legend(['Pipe 1','Stack','Pipe 2','Pipe 3','Pump'])     
+#     plt.plot(taxis,pvec[ii,:],'--')
+# plt.legend(['Pipe 1','Stack','Pipe 2','Pipe 3','Pump']) 
+# plt.xlabel('Time [hr]')
+# plt.ylabel('Differential pressure [millibar]')    
