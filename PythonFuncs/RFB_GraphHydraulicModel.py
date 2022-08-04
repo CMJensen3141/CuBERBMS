@@ -64,6 +64,8 @@ class GraphHydraulicModel:
         
         numsteps = math.ceil(Ts_ext/Ts_int)
         
+        BJBT = -np.linalg.inv((B @ J @ B.T).reshape(1,1)) # Pre-calculate and hardcode inverted matrix to save computational effort
+        
         
         @njit
         def NumbaTimestep(qC,q,w):
@@ -80,7 +82,7 @@ class GraphHydraulicModel:
                         rs = np.multiply(S,rs)
                         r_pump = G @ -(0.0001*(w*w)+0.0004*w*q[-1]-0.0355*np.absolute(q[-1])*q[-1])
                         r_pump = r_pump.reshape(5,1)
-                        qC_dot = -np.linalg.inv((B @ J @ B.T).reshape(1,1)) * (B @ (rp+rs+r_pump))
+                        qC_dot = BJBT * (B @ (rp+rs+r_pump))
                         qC += qC_dot*Ts_int
                         q = BT @ qC
                         dP = J@BT*qC_dot*Ts_int + rp + rs + r_pump
@@ -100,7 +102,7 @@ class GraphHydraulicModel:
 
 import matplotlib.pyplot as plt
 
-fooMod = GraphHydraulicModel(10,0.05)
+fooMod = GraphHydraulicModel(10,0.01)
 
 simtime = 10
 
@@ -110,20 +112,21 @@ taxis = np.linspace(0,simtime,simlen)
 qCvec = np.empty([1,simlen])
 qvec = np.empty([5,simlen])
 pvec = np.empty([5,simlen])
-vals = np.empty([5])
+vals = fooMod.GetVals()
 
 for ii in range(0,simlen):
-    vals = fooMod.GetVals()
+    # vals = fooMod.GetVals()
     qCvec[:,ii] = 16.7*vals[0].flatten()
     qvec[:,ii] = 16.7*vals[1].flatten()
     pvec[:,ii] = 1000*vals[2].flatten()
     if ii > simlen/2:
-        out = fooMod.NumbaStep(fooMod.qC,fooMod.q,float(100))
+        out = fooMod.NumbaStep(vals[0],vals[1],float(100))
     elif ii > simlen/4:
-        out = fooMod.NumbaStep(fooMod.qC,fooMod.q,float(40))
+        out = fooMod.NumbaStep(vals[0],vals[1],float(40))
     else:
-        out = fooMod.NumbaStep(fooMod.qC,fooMod.q,float(0))
-    fooMod.SetVals(out[0], out[1], out[2])
+        out = fooMod.NumbaStep(vals[0],vals[1],float(0))
+    # fooMod.SetVals(out[0], out[1], out[2])
+    vals = out
        
 #%% 
         
