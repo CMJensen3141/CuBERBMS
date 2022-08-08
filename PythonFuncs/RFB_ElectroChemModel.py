@@ -52,7 +52,7 @@ class CuRFB_EC:
         
         @njit
         def NumbaTimestep(qa,qc,I,c_cell,c_tank):
-            Q = np.array([[qa, 0, 0, 0,],[0, qa, 0, 0],[qc, 0, 0, 0],[0, 0, 0, qc]],dtype = np.float64)
+            Q = np.array([[qa, 0, 0, 0,],[0, qa, 0, 0],[0, 0, qc, 0],[0, 0, 0, qc]],dtype = np.float64)
             currentpart = 1/(z*F)*CurrentSigns*I
             for ii in range(0,numsteps):
                 flowpart = Q@(c_tank-c_cell).reshape(4,1)
@@ -91,7 +91,7 @@ class CuRFB_EC:
         @njit
         def NumbaVoltage(T_cell,c_tank):
             c_tank_stab = c_tank+0.1
-            voltvar = E0 + R*T_cell/F*np.log((c_tank_stab[0]/c_tank_stab[1])*(c_tank_stab[2])/c_tank_stab[3])
+            voltvar = E0 + R*T_cell/F*np.log((c_tank_stab[0]/c_tank_stab[1])*(c_tank_stab[3]/c_tank_stab[2]))
             return voltvar
         return NumbaVoltage
     
@@ -101,9 +101,9 @@ class CuRFB_EC:
             
 #%% Unit tests
 
-Ts_ext = 100
+Ts_ext = 10
 Ts = 1
-c_init_tanks = np.array([200,2300,2300,200],dtype = np.float64).reshape(4,1)
+c_init_tanks = np.array([0,2500,2500,0],dtype = np.float64).reshape(4,1)
 c_init_cell = np.array([0,0,0,0],dtype = np.float64).reshape(4,1)
 # c_init_cell = c_init_tanks
 fooCU = CuRFB_EC(c_init_tanks, c_init_cell, Ts_ext, Ts)
@@ -117,7 +117,7 @@ import matplotlib.pyplot as plt
 literstocubic = 1.66666667*10**-5
 
 
-simtime = 24 # Simulation time in hours
+simtime = 48 # Simulation time in hours
 
 simlen = round((simtime*3600)/Ts_ext) 
 
@@ -130,20 +130,20 @@ SOCbat = np.empty([1,simlen])
 
 flow1 = 10*literstocubic
 flow2 = 10*literstocubic
-I_d = -150
-I_c = 150
+I_d = -100
+I_c = 100
 
 for ii in range(0,simlen):
     cellvals = fooCU.Model_GetCells()
     tankvals = fooCU.Model_GetTanks()
         
     if ii < simlen/2:
-        if SOCbat[:,ii-1] < 0.8:
+        if SOCbat[:,ii-1] < 0.95:
             out = fooCU.Numba_Timestep(flow1, flow1, I_c, cellvals, tankvals)
         else:
             out = fooCU.Numba_Timestep(flow1, flow1, 0, cellvals, tankvals)
     else:
-        if SOCbat[:,ii-1] > 0.2:
+        if SOCbat[:,ii-1] > 0.05:
             out = fooCU.Numba_Timestep(flow2, flow2, I_d, cellvals, tankvals)
         else:
             out = fooCU.Numba_Timestep(flow2, flow2, 0, cellvals, tankvals)
@@ -164,14 +164,20 @@ dims = taxis.shape
         
 plt.figure()
 for ii in range(0,c_tank.shape[0]):
-    plt.plot(taxis,c_tank[ii,:].reshape(dims[0],dims[1]))
-plt.legend(['Anolyte 1','Anolyte 2','Catholyte 2','Catholyte 1'])
+    if ii < 2:
+        plt.plot(taxis,c_tank[ii,:].reshape(dims[0],dims[1]))
+    else:
+        plt.plot(taxis,c_tank[ii,:].reshape(dims[0],dims[1]),'--')
+plt.legend(['Anolyte 1','Anolyte 2','Catholyte 1','Catholyte 2'])
 plt.ylabel('Species concentrations, tanks')
 plt.xlabel('Time [hr]')  
 
 plt.figure()
 for ii in range(0,c_cell.shape[0]):
-    plt.plot(taxis,c_cell[ii,:].reshape(dims[0],dims[1]))
+    if ii < 2:
+        plt.plot(taxis,c_cell[ii,:].reshape(dims[0],dims[1]))
+    else:
+        plt.plot(taxis,c_cell[ii,:].reshape(dims[0],dims[1]),'--')
 plt.legend(['Anolyte 1','Anolyte 2','Catholyte 1','Catholyte 2'])
 plt.ylabel('Species concentrations, cells')
 plt.xlabel('Time [hr]')  
