@@ -227,7 +227,7 @@ def run_sync_client():
         print ("Ikke doed 2")
         
         try:
-            time.sleep(1)
+            # time.sleep(1)
             rr = client.read_holding_registers(Reg_SOC, 1, unit=UNIT)
             if rr.function_code >= 0x80:
                 print("Read error")
@@ -257,7 +257,9 @@ def run_sync_client():
     # ----------------------------------------------------------------------- #
     # close the client
     # ----------------------------------------------------------------------- #
+    print("Closing connection to BMS server")
     client.close()
+    print("Connection successfully closed")
 
 
 if __name__ == "__main__":

@@ -62,7 +62,10 @@ class GraphHydraulicModel:
         Kp = self.Kp.astype(np.float64); B = self.B.astype(np.float64); J = self.J.astype(np.float64); G = self.G.astype(np.float64); Ts_int = self.Ts_intern; Ts_ext = self.Ts_extern; # Local copies of necessary static variables
         BT = B.T.astype(np.float64); S = np.array([0,1,0,0,0]).reshape(5,1)
         
-        numsteps = math.ceil(Ts_ext/Ts_int)
+        if math.ceil(Ts_ext/Ts_int) > 1:
+            numsteps = math.ceil(Ts_ext/Ts_int)
+        else:
+            numsteps = 1
         
         BJBT = -np.linalg.inv((B @ J @ B.T).reshape(1,1)) # Pre-calculate and hardcode inverted matrix to save computational effort
         
@@ -98,48 +101,48 @@ class GraphHydraulicModel:
         self.q = q 
         self.dP = dP
 
-# %% Test that class works correctly
+if __name__ == "__main__": # Unit tests, run only if executing this file as main window
 
-import matplotlib.pyplot as plt
-
-fooMod = GraphHydraulicModel(10,0.01)
-
-simtime = 10
-
-simlen = round(simtime*3600/fooMod.Ts_extern)
-taxis = np.linspace(0,simtime,simlen)
-
-qCvec = np.empty([1,simlen])
-qvec = np.empty([5,simlen])
-pvec = np.empty([5,simlen])
-vals = fooMod.GetVals()
-
-for ii in range(0,simlen):
+    import matplotlib.pyplot as plt
+    
+    fooMod = GraphHydraulicModel(10,0.01)
+    
+    simtime = 10
+    
+    simlen = round(simtime*3600/fooMod.Ts_extern)
+    taxis = np.linspace(0,simtime,simlen)
+    
+    qCvec = np.zeros([1,simlen])
+    qvec = np.zeros([5,simlen])
+    pvec = np.zeros([5,simlen])
     # vals = fooMod.GetVals()
-    qCvec[:,ii] = 16.7*vals[0].flatten()
-    qvec[:,ii] = 16.7*vals[1].flatten()
-    pvec[:,ii] = 1000*vals[2].flatten()
-    if ii > simlen/2:
-        out = fooMod.NumbaStep(vals[0],vals[1],float(100))
-    elif ii > simlen/4:
-        out = fooMod.NumbaStep(vals[0],vals[1],float(40))
-    else:
-        out = fooMod.NumbaStep(vals[0],vals[1],float(0))
-    # fooMod.SetVals(out[0], out[1], out[2])
-    vals = out
-       
-#%% 
-        
-plt.figure()
-for ii in range(0,5):
-    plt.plot(taxis,qvec[ii,:],'--')
-plt.legend(['Pipe 1','Stack','Pipe 2','Pipe 3','Pump'])   
-plt.xlabel('Time [hr]')
-plt.ylabel('Flow [l/min]')
-
-plt.figure()
-for ii in range(0,5):
-    plt.plot(taxis,pvec[ii,:],'--')
-plt.legend(['Pipe 1','Stack','Pipe 2','Pipe 3','Pump']) 
-plt.xlabel('Time [hr]')
-plt.ylabel('Differential pressure [millibar]')    
+    
+    for ii in range(0,simlen):
+        vals = fooMod.GetVals()
+        qCvec[:,ii] = 16.7*vals[0].flatten()
+        qvec[:,ii] = 16.7*vals[1].flatten()
+        pvec[:,ii] = 1000*vals[2].flatten()
+        if ii > simlen/2:
+            out = fooMod.NumbaStep(vals[0],vals[1],float(100))
+        elif ii > simlen/4:
+            out = fooMod.NumbaStep(vals[0],vals[1],float(40))
+        else:
+            out = fooMod.NumbaStep(vals[0],vals[1],float(0))
+        fooMod.SetVals(out[0], out[1], out[2])
+        # vals = out
+           
+    #%% 
+            
+    plt.figure()
+    for ii in range(0,5):
+        plt.plot(taxis,qvec[ii,:],'--')
+    plt.legend(['Pipe 1','Stack','Pipe 2','Pipe 3','Pump'])   
+    plt.xlabel('Time [hr]')
+    plt.ylabel('Flow [l/min]')
+    
+    plt.figure()
+    for ii in range(0,5):
+        plt.plot(taxis,pvec[ii,:],'--')
+    plt.legend(['Pipe 1','Stack','Pipe 2','Pipe 3','Pump']) 
+    plt.xlabel('Time [hr]')
+    plt.ylabel('Differential pressure [millibar]')    

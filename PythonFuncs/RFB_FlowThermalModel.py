@@ -14,11 +14,11 @@ import math
 from numba import njit, jit
 
 class RFB_FD_ThermalModel: 
-    def __init__(self,Rstack,Tsample_extern,Tsample_intern):
+    def __init__(self,Rstack,T_ambient,Tsample_extern,Tsample_intern):
         self.Rstack = Rstack
         self.Vstack = 0.02 # Stack volume in m^3
-        self.Vtanks = 0.1 # Tank volumes (assumed equal) in m^3
-        self.T_air = 25 # Ambient temperature
+        self.Vtanks = 0.05 # Tank volumes (assumed equal) in m^3
+        self.T_air = T_ambient # Ambient temperature
         # self.T_a = self.T_air  # Anolyte temperature
         # self.T_c = self.T_air  # Catholyte temperature
         # self.T_s = self.T_air  # Stack temperature
@@ -50,7 +50,10 @@ class RFB_FD_ThermalModel:
     def NumbaGenerator(self):
         Cp = self.Cp; rho = self.rho; Rstack = self.Rstack; Vstack = self.Vstack; Vtanks = self.Vtanks; UA = self.UA; Ts_ext = self.Tsample_extern; Ts_int = self.Tsample_intern; # Local copies of necessary static variables
         
-        numsteps = math.ceil(Ts_ext/Ts_int)
+        if math.ceil(Ts_ext/Ts_int) > 1:
+            numsteps = math.ceil(Ts_ext/Ts_int)
+        else:
+            numsteps = 1
         
         @njit
         def NumbaTimestep(T_s,T_a,T_c,T_air,Qplus,Qminus,I):
@@ -79,51 +82,51 @@ class RFB_FD_ThermalModel:
 
 
 
-#%%
+if __name__ == "__main__": # Unit tests, run only if executing this file as main window
 
-import numpy as np
-import matplotlib.pyplot as plt
-
-literstocubic = 1.66666667*10**-5
-Ts = 10
-
-
-fooMod = RFB_FD_ThermalModel(0.073,Ts,0.01)
-
-simtime = 40 # Simulation time in hours
-
-simlen = round((simtime*3600)/Ts) 
-
-Tstack = np.empty([simlen,1])
-Tano = np.empty([simlen,1])
-Tcat = np.empty([simlen,1])
-
-flow1 = 10*literstocubic
-flow2 = 10*literstocubic
-
-for ii in range(0,simlen):
-    Tvec = fooMod.GetTemps()
-    Tstack[ii] = Tvec[0]
-    Tano[ii] = Tvec[1]
-    Tcat[ii] = Tvec[2]
-    if ii < simlen/2:
-        Tout = fooMod.NumbaStep(Tvec[0],Tvec[1],Tvec[2],fooMod.T_air,flow1,flow2,150)
-    else:
-        #fooMod.ModelTimestep(flow2,flow2,-150)
-        Tout = fooMod.NumbaStep(Tvec[0],Tvec[1],Tvec[2],fooMod.T_air,flow1,flow2,-150)
-    fooMod.SetTemps(Tout[0], Tout[1], Tout[2])
+    import numpy as np
+    import matplotlib.pyplot as plt
+    
+    literstocubic = 1.66666667*10**-5
+    Ts = 10
     
     
+    fooMod = RFB_FD_ThermalModel(0.073, 25, Ts,0.01)
     
-taxis = np.linspace(0,simtime,simlen)
-
-#%%
+    simtime = 40 # Simulation time in hours
+    
+    simlen = round((simtime*3600)/Ts) 
+    
+    Tstack = np.empty([simlen,1])
+    Tano = np.empty([simlen,1])
+    Tcat = np.empty([simlen,1])
+    
+    flow1 = 10*literstocubic
+    flow2 = 10*literstocubic
+    
+    for ii in range(0,simlen):
+        Tvec = fooMod.GetTemps()
+        Tstack[ii] = Tvec[0]
+        Tano[ii] = Tvec[1]
+        Tcat[ii] = Tvec[2]
+        if ii < simlen/2:
+            Tout = fooMod.NumbaStep(Tvec[0],Tvec[1],Tvec[2],fooMod.T_air,flow1,flow2,150)
+        else:
+            #fooMod.ModelTimestep(flow2,flow2,-150)
+            Tout = fooMod.NumbaStep(Tvec[0],Tvec[1],Tvec[2],fooMod.T_air,flow1,flow2,-150)
+        fooMod.SetTemps(Tout[0], Tout[1], Tout[2])
         
-plt.figure()
-plt.plot(taxis,Tstack,'b--')
-plt.plot(taxis,Tano,'r--')
-plt.plot(taxis,Tcat,'g--')
-plt.legend(["Stack","Anolyte", "Catholyte"])
-plt.ylabel('Temperature [$C^o$]')
-plt.xlabel('Time [hr]')   
+        
+        
+    taxis = np.linspace(0,simtime,simlen)
+    
+    #%%
+            
+    plt.figure()
+    plt.plot(taxis,Tstack,'b--')
+    plt.plot(taxis,Tano,'r--')
+    plt.plot(taxis,Tcat,'g--')
+    plt.legend(["Stack","Anolyte", "Catholyte"])
+    plt.ylabel('Temperature [$C^o$]')
+    plt.xlabel('Time [hr]')   
     

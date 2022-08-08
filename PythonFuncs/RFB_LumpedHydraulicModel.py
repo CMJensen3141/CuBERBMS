@@ -45,50 +45,50 @@ class RFB_LumpedHydraulicModel:
         return self.Rcell    
     
     
-#%% Test code
+if __name__ == "__main__": # Unit tests, run only if executing this file as main window
 
-import ControlFuncs as CF
-import matplotlib.pyplot as plt
-import numpy as np
-
-viscosity = 0.006
-permeability = 1.685-10
-density = 1400
-length = 0.26
-width = 0.30
-depth = 3e-03
-Nseries = 15
-
-PascalToBar = 1e-5
-
-FlowController = CF.PID(0.005,0.001,0,0,0.1,0)
-
-
-LumpedModel = RFB_LumpedHydraulicModel(viscosity,permeability,density,length,width,depth,Nseries)
-
-print("Stack Darcy resistance is " + str(LumpedModel.Get_DarcyResistance()))
-
-FlowRate = 0
-
-dP = LumpedModel.Get_StackPressure()
-numiters = 1000
-
-print("Differential pressure is " + str(dP) + " pascal")
-print("Differential pressure is " + str(dP*PascalToBar) + " bar" )
-
-dP = np.empty(numiters)
-Q = np.empty(numiters)
-
-for ii in range(0,numiters):
-    FlowRate = FlowController.run(ii,0.5,LumpedModel.Get_StackPressure(),FlowRate)
-    LumpedModel.Model_Timestep(FlowRate)
-    dP[ii] = LumpedModel.Get_StackPressure()
-    Q[ii] = FlowRate
-
-plt.figure()
-plt.plot(dP,'b--')
-plt.legend(["Stack differential pressure [bar]"])
-
-plt.figure()
-plt.plot(Q,'r')
-"Electrolyte flow [L/s]"
+    import ControlFuncs as CF
+    import matplotlib.pyplot as plt
+    import numpy as np
+    
+    viscosity = 0.006
+    permeability = 1.685-10
+    density = 1400
+    length = 0.26
+    width = 0.30
+    depth = 3e-03
+    Nseries = 15
+    
+    PascalToBar = 1e-5
+    
+    FlowController = CF.PID(0.005,0.001,0,0,0.1,0)
+    
+    
+    LumpedModel = RFB_LumpedHydraulicModel(viscosity,permeability,density,length,width,depth,Nseries)
+    
+    print("Stack Darcy resistance is " + str(LumpedModel.Get_DarcyResistance()))
+    
+    FlowRate = 0
+    
+    dP = LumpedModel.Get_StackPressure()
+    numiters = 1000
+    
+    print("Differential pressure is " + str(dP) + " pascal")
+    print("Differential pressure is " + str(dP*PascalToBar) + " bar" )
+    
+    dP = np.empty(numiters)
+    Q = np.empty(numiters)
+    
+    for ii in range(0,numiters):
+        FlowRate = FlowController.run(ii,0.5,LumpedModel.Get_StackPressure(),FlowRate)
+        LumpedModel.Model_Timestep(FlowRate)
+        dP[ii] = LumpedModel.Get_StackPressure()
+        Q[ii] = FlowRate
+    
+    plt.figure()
+    plt.plot(dP,'b--')
+    plt.legend(["Stack differential pressure [bar]"])
+    
+    plt.figure()
+    plt.plot(Q,'r')
+    "Electrolyte flow [L/s]"

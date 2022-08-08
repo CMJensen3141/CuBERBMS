@@ -115,62 +115,62 @@ class RFB_ThermalModel:
         return self.P_cooling
 
         
-#%% "Unit test" environment
+if __name__ == "__main__": # Unit tests, run only if executing this file as main window
 
-import matplotlib.pyplot as plt
-import ControlFuncs as CF
-
-Regulator = CF.PID(1,0.1,0,0,0.1,0)
-
-SP = 50
-
-R_stack = 2.1e-04
-R_pipes = 1.0e-03
-R_he = 3.8e-03
-R_ambient = 2*8.4e-03
-C_stack = 4.7e03
-C_pipes = 5.2e04
-C_he = 4.7e05
-
-TestMod = RFB_ThermalModel(R_stack,R_pipes,R_he,R_ambient*2,C_stack,C_pipes,C_he,1)
-
-numCycles = 100
-
-
-cycleLen = int(50*60/TestMod.dt)
-count = 0
-T_stack = np.empty(numCycles*cycleLen)
-T_pipes = np.empty(numCycles*cycleLen)
-T_he = np.empty(numCycles*cycleLen)
-P_total = np.empty(numCycles*cycleLen)
-P_cool = np.empty(numCycles*cycleLen)
-
-
-for ii in range(0,numCycles*cycleLen):
-    CoolP = Regulator.run(ii,SP,TestMod.get_system_temps()[0],TestMod.get_cooling())
-    TestMod.set_cooling(CoolP)
-    TestMod.Model_Timestep()
-    TempVec = TestMod.get_system_temps()
-    T_stack[ii] = TempVec[0]
-    T_pipes[ii] = TempVec[1]
-    T_he[ii] = TempVec[2]
-    P_total[ii] = TestMod.get_power()
-    P_cool[ii] = TestMod.get_cooling()
-    count += 1
-    mode = TestMod.get_mode()
-    if count == cycleLen:
-        TestMod.set_mode(-mode)
-        count = 0
-        
+    import matplotlib.pyplot as plt
+    import ControlFuncs as CF
     
-plt.figure()
-plt.plot(T_stack,'b--')
-plt.plot(T_pipes,'r--')
-plt.plot(T_he,'g--')
-plt.legend(["Stack","Pipes", "Heat Exchanger"])
-
-plt.figure()
-plt.plot(P_total,'b')
-plt.plot(P_cool,'r')
-plt.plot(P_total-P_cool,'--k')
-plt.legend(["Heat input to system","Heat removed at heat exchanger","Total heat"])
+    Regulator = CF.PID(1,0.1,0,0,0.1,0)
+    
+    SP = 50
+    
+    R_stack = 2.1e-04
+    R_pipes = 1.0e-03
+    R_he = 3.8e-03
+    R_ambient = 2*8.4e-03
+    C_stack = 4.7e03
+    C_pipes = 5.2e04
+    C_he = 4.7e05
+    
+    TestMod = RFB_ThermalModel(R_stack,R_pipes,R_he,R_ambient*2,C_stack,C_pipes,C_he,1)
+    
+    numCycles = 100
+    
+    
+    cycleLen = int(50*60/TestMod.dt)
+    count = 0
+    T_stack = np.empty(numCycles*cycleLen)
+    T_pipes = np.empty(numCycles*cycleLen)
+    T_he = np.empty(numCycles*cycleLen)
+    P_total = np.empty(numCycles*cycleLen)
+    P_cool = np.empty(numCycles*cycleLen)
+    
+    
+    for ii in range(0,numCycles*cycleLen):
+        CoolP = Regulator.run(ii,SP,TestMod.get_system_temps()[0],TestMod.get_cooling())
+        TestMod.set_cooling(CoolP)
+        TestMod.Model_Timestep()
+        TempVec = TestMod.get_system_temps()
+        T_stack[ii] = TempVec[0]
+        T_pipes[ii] = TempVec[1]
+        T_he[ii] = TempVec[2]
+        P_total[ii] = TestMod.get_power()
+        P_cool[ii] = TestMod.get_cooling()
+        count += 1
+        mode = TestMod.get_mode()
+        if count == cycleLen:
+            TestMod.set_mode(-mode)
+            count = 0
+            
+        
+    plt.figure()
+    plt.plot(T_stack,'b--')
+    plt.plot(T_pipes,'r--')
+    plt.plot(T_he,'g--')
+    plt.legend(["Stack","Pipes", "Heat Exchanger"])
+    
+    plt.figure()
+    plt.plot(P_total,'b')
+    plt.plot(P_cool,'r')
+    plt.plot(P_total-P_cool,'--k')
+    plt.legend(["Heat input to system","Heat removed at heat exchanger","Total heat"])

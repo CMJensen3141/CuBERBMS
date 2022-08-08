@@ -608,7 +608,9 @@ class Sim_BMS(object):
                                       self.battery.get_stack_voltage(),
                                       self.battery.get_stack_power(),
                                       self.battery.get_pressure(),
-                                      self.battery.get_state_of_charge());
+                                      self.battery.get_state_of_charge(),
+                                      self.battery.get_stack_temperature(),
+                                      self.battery.get_flowrate());
 
             self.Rs, self.Rp, self.Cp, self.OCV, V_hat = myBMS.RLSEstimator.RLS_run(myBMS.U_meas,myBMS.I_meas)
 #        print('Estimated parameters: Rs = {}, Rp = {}, Cp = {}'.format(Rs,Rp,Cp))
