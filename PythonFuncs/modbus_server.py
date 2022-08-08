@@ -8,30 +8,13 @@ import random
 import CuBMS as CB
 import numpy as np
 import ControlFuncs as CF
+import RFB_CombinedModel as ComMod
 
 
 
 # --------------------------------------------------------------------------- #
 # set invariant parameters of imported models
 # --------------------------------------------------------------------------- #
-
-# thermal parameters
-R_stack = 2.1e-04
-R_pipes = 1.0e-03
-R_he = 3.8e-03
-R_ambient = 2*8.4e-03
-C_stack = 4.7e03
-C_pipes = 5.2e04
-C_he = 4.7e05
-
-# hydraulic parameters
-viscosity = 0.006 # Electrolyte viscosity
-permeability = 1.685e-10 # Electrode permeability
-density = 1400
-length = 0.26 # Half-cell length
-width = 0.30 # Half-cell width
-depth = 3e-03 # Half-cell depth
-Nseries = 15 # Number of stack cells in series
 
 # BMS parametre
 BMS_mu     = 0.1 #Step size i RLS estimator
@@ -47,6 +30,8 @@ BMS_I_min   = -150 # Minimum limit (current)
 BMS_I_tog   = 50   # Pump current threshold / toggle
 BMS_PumpMax = 2    # Flow in [m^3/h]
 BMS_PumpMin = 0.0  # Flow in [m^3/h]
+
+AtmPres = 1000 # Atmospheric pressure in mbar
 
 myBMS = CB.CuBMS(BMS_Lim_max, BMS_Lim_min, BMS_I_max, BMS_I_min, BMS_I_tog, BMS_PumpMax, BMS_PumpMin,BMS_EstMode)
 #TempRegulator = CF.PID(0.01,0.05,0,0,0.1,0)
@@ -122,7 +107,7 @@ Reg_thermal_temp_catholyte  = 139; #Temperature of the heat exchanger in the cat
 Reg_thermal_temp_anolyte    = 140; #Temperature of the heat exchanger in the anolyte circuit
 reg_anolyte_pressure_out    = 141; #Pressure in the anolyte circuit after the stack
 reg_catholyte_pressure_out  = 142; #Pressure in the catholyte circuit after the stack
-reg_anolythe_temp_out       = 143; #Temperature in the anolyte circuit after the stack
+reg_anolyte_temp_out        = 143; #Temperature in the anolyte circuit after the stack
 reg_catholyte_temp_out      = 144; #catholyte_temp_out
 reg_control_bms             = 145; #BMS reference mode, 1 = power reference, 0= voltage reference/max current (Visblue control method) 
 reg_rs_est                  = 146; # serial resistance * 1000 
@@ -239,17 +224,30 @@ class Sim_pump(object):
     def __init__(self):
         self.pump_speed = 0
         self.pump_running = False
+        self.max_speed = 3000
     def get_pump_speed(self):
-        if self.pump_running == True:
-            self.pump_speed = 3000
-        else:
-            self.pump_speed = 0
         return(self.pump_speed)
+    def get_pump_duty(self):
+        return (self.get_pump_speed()/self.max_speed)*100
+    def set_pump_speed(self,speed):
+        if speed < 0:
+            speed = 0
+        if speed > self.max_speed:
+            speed = self.max_speed
+        self.pump_speed = speed
+    def set_pump_duty(self,duty):
+        if duty < 0:
+            duty = 0
+        if duty > 100:
+            duty = 100
+        self.pump_speed = (self.max_speed*duty)/100
     def start_pump(self):
         self.pump_running = True
+        self.set_pump_speed(self.max_speed)
         return(self.pump_running)
     def stop_pump(self):
         self.pump_running = False
+        self.set_pump_speed(0)
         return(self.pump_running)
         
 class Sim_battery(object):
@@ -267,18 +265,15 @@ class Sim_battery(object):
         self.V_dc = self.cell_voltage*self.cell_number #rated voltage 
         self.E_tank = 50 * kWh_to_J #value in Joule from 25 kWh
         self.E_tank_kWh = self.E_tank/kWh_to_J
-        self.V_charging = self.V_dc
-        self.I_max = self.P_max / self.V_charging 
+        # self.V_charging = self.V_dc
+        self.I_max = self.P_max / self.V_dc
         
         self.R_1 = self.P_loss_max / (self.I_max*self.I_max)  #calculate resistance from losses and estimated current
-        # C= Q/V_DC
-        # t_full_charge ~= 4 * tidskonstant = 4* R*C ~=  E_tank/P_max
-        # 4*R*C ~= E_tank/P_max <=> C ~=  E_tank/(4*R*P_max)
         self.C =  self.E_tank/(4*self.R_1*self.P_max) 
         self.time_const = self.R_1*self.C
         self.Q_tank = self.C* self.V_dc
-        self.dt = 0.1 #delta t in seconds
-        self.iternum = 100/self.dt
+        self.dt = 60 #delta t in seconds
+        # self.iternum = 100/self.dt
         CB.setTimeStep(myBMS, self.dt)
         
         self.chargingEnabled = False
@@ -291,83 +286,47 @@ class Sim_battery(object):
         self.Q_cap = self.Q_tank*0.5 #Coloumb
         self.V_cap = self.V_cap = self.Q_cap/self.C; #V
         self.V_stack = self.V_cap
-        self.I_charge = 0 #A
+        self.Icharge = 0 #A
         self.P_stack_input =0 #W
         self.charging_temp = 60
         self.standby_temp = 45
         self.stack_temperature = self.standby_temp;
         self.V_charging = 0
         self.SOC =0
-        self.SOC_MAX = 0.95* self.E_tank #max charge to 95%
-        self.SOC_MIN = 0.05* self.E_tank #max discharge to 5%
+        self.SOC_MAX = 0.95
+        self.SOC_MIN = 0.05
         
         self.FlowRate = 0 # Unit is L/s
         self.P_Cooling = 0 # Unit is W
+        
+        self.c_total = 2500 # Total concentration in mol/m^3 of electrolyte species
+        self.T_ambient = 30 # Ambient temperature in degrees celsius
+        
+        self.CombinedModel = ComMod.RFB_CombinedModel(self.dt, self.R_1, self.T_ambient, self.c_total)
 
-        self.ThermalModel = TModel.RFB_ThermalModel(R_stack,R_pipes,R_he,R_ambient*2,C_stack,C_pipes,C_he,1)
-        self.HydraulicModel = HModel.RFB_LumpedHydraulicModel(viscosity,permeability,density,length,width,depth,Nseries)
-
-    def update_stack_simulation(self,Icharge):
+    def update_stack_simulation(self,w_ano,w_cat,Icharge):
 
         if (self.charging == True):
-            self.V_charging =self.V_dc; #charging          
-            if self.SOC >= self.SOC_MAX:
+            if self.CombinedModel.GetSOC() >= self.SOC_MAX:
                 self.chargingEnabled = False #no overcharging
-        else:
-            self.V_charging =0; #Discharging       
-            #if self.SOC <= self.SOC_MIN:
-            #    self.chargingEnabled = False #no undercharging
-            #    print("MIN SOC reached")
+                Icharge = 0
+        else:     
+            if self.CombinedModel.GetSOC() <= self.SOC_MIN:
+                self.chargingEnabled = False #no undercharging
+                Icharge = 0
+                print("MIN SOC reached")
             
-        if self.chargingEnabled == False:
-            self.V_charging = self.V_cap; #shut off charging)
-            self.I_charge =0;
-            self.stack_temperature = self.standby_temp ###@TODO better model
-        else:
-            self.ThermalModel.set_cooling(self.P_Cooling)
-            self.stack_temperature = self.ThermalModel.Model_Timestep()
-            self.HydraulicModel.Model_Timestep(self.FlowRate)
-            
-            self.I_charge = Icharge
-            if self.I_charge > self.Charge_limit:
-                self.I_charge = self.Charge_limit;
-            if self.I_charge < self.Discharge_limit:
-                self.I_charge = self.Discharge_limit;
-                
-            
-                
-        substep = 0
-        steps_in_substep = 4
-        subdt = self.dt / steps_in_substep # divide timestep
-        while substep < steps_in_substep:
-            substep = substep + 1
-            self.Q_cap = self.Q_cap + subdt * self.I_charge;
-            
-            if self.Q_cap < 0:
-                self.Q_cap = 0
-                self.V_cap = 0            
-                self.I_charge = 0
-                print("Qcap < 0")
-            else:
-                self.Q_cap = self.Q_cap + subdt * self.I_charge;
-                self.V_cap = self.Q_cap/self.C;
-            
-                
-            self.V_stack =self.V_cap + self.I_charge * self.R_1;
-            if self.V_stack < 0:
-                self.V_stack = 0;
-                print("Vstack < 0 with I_charge = " + str(self.I_charge))
-                self.I_charge = (self.V_stack-self.V_cap)/self.R_1;
-            self.P_stack_input = self.V_stack * self.I_charge;
-            self.SOC = self.V_cap * self.Q_cap
-            self.Q_cap = self.Q_cap * CAP_LOSS
-            self.C = self.C * CAP_LOSS # Simulate capacity loss               
-#        print('SIM_Battery UPD: Q = {}, V_cap={}'.format(self.Q_cap, self.V_cap))
+        self.CombinedModel.Model_Timestep(w_ano,w_cat,Icharge)
+        self.V_stack = self.CombinedModel.GetVoltage(); 
+        self.set_stack_current(Icharge)
+
         
     def get_stack_voltage(self):
         return (self.V_stack)
     def get_stack_current(self):
-        return (self.I_charge)
+        return (self.Icharge)
+    def set_stack_current(self,current):
+        self.Icharge = current
     def get_stack_power (self):
         return (self.P_stack_input)
     def get_state_of_charge(self): #return J
@@ -412,7 +371,7 @@ class Sim_battery(object):
     def set_flowrate(self,FlowRate):
         self.FlowRate = FlowRate
     def get_pressure(self):
-        return(self.HydraulicModel.Get_StackPressure())
+        return self.CombinedModel.GetAnoPressure_Stack()
     def get_cooling(self):
         return(self.P_Cooling)
     def set_cooling(self,P_Cooling):
@@ -468,11 +427,12 @@ class Sim_BMS(object):
     def get_battery_current(self):
         return int(self.battery.get_stack_current())
     def get_battery_voltage(self):
-        return int(self.battery.get_stack_current())
+        return int(self.battery.get_stack_voltage())
     def get_battery_power(self):
         return int(self.battery.get_stack_power())
     def get_battery_soc(self):
-        return int(self.battery.get_state_of_charge() * J_to_Wh + 0.5) #Convertfor modbus
+        return self.CombinedModel.GetSOC()
+        # return int(self.battery.get_state_of_charge() * J_to_Wh + 0.5) #Convertfor modbus
     def set_power_reference(self, new_reference):
         self.power_reference = new_reference
         return int(self.power_reference)
@@ -539,80 +499,79 @@ class Sim_BMS(object):
         return self.simulationTime
     
     def update_simulation(self):
-        iters = 0
-        while iters < self.battery.iternum:
-            iters += 1
-            self.simulationTime += self.battery.dt;
-            
-            BMS_state = self.get_BMS_state()
-            if self.battery.SOC <= self.battery.SOC_MIN:
-                if BMS_state == BMS_DISCHARGING:
-                    self.stop_charger()
-                    print("MIN SOC reached")
-            elif self.battery.SOC >= self.battery.SOC_MAX:
-                if BMS_state == BMS_CHARGING:
-                    self.stop_charger()
-                    print("MAX SOC reached")
-    
-            bat_voltage=self.battery.get_stack_voltage()*1.0
-            #current_ref = 0
-            power_ref = self.get_power_reference()*1.0
-            #if bat_voltage > MIN_DISCHARGE_VOLTAGE:
-            #DIVISION_FIX = 0.001;
-            #print("Power ref = {}".format(power_ref) )
+        self.simulationTime += self.battery.dt;
+        
+        BMS_state = self.get_BMS_state()
+        if self.battery.SOC <= self.battery.SOC_MIN:
             if BMS_state == BMS_DISCHARGING:
-                CB.setRefPower(myBMS,-power_ref)
-            elif BMS_state == BMS_CHARGING:
-                CB.setRefPower(myBMS,power_ref)
+                self.stop_charger()
+                print("MIN SOC reached")
+        elif self.battery.SOC >= self.battery.SOC_MAX:
+            if BMS_state == BMS_CHARGING:
+                self.stop_charger()
+                print("MAX SOC reached")
+
+        bat_voltage=self.battery.get_stack_voltage()*1.0
+        #current_ref = 0
+        power_ref = self.get_power_reference()*1.0
+        #if bat_voltage > MIN_DISCHARGE_VOLTAGE:
+        #DIVISION_FIX = 0.001;
+        #print("Power ref = {}".format(power_ref) )
+        if BMS_state == BMS_DISCHARGING:
+            CB.setRefPower(myBMS,-power_ref)
+        elif BMS_state == BMS_CHARGING:
+            CB.setRefPower(myBMS,power_ref)
+        else:
+            CB.setRefPower(myBMS,0)
+        
+        #current_ref =  power_ref / (bat_voltage + DIVISION_FIX)
+        current_ref_ctrl = CB.calcInvRef(myBMS)
+        #print("Current ref {}".format(current_ref_ctrl))
+#        self.current_ref = 0.25 * self.current_ref + 0.75 * current_ref_ctrl
+        self.current_ref = current_ref_ctrl
+        if self.current_ref > self.battery.get_charge_limit():
+            self.current_ref = self.battery.get_charge_limit()
+        if BMS_state == BMS_STANDBY:
+            self.current_ref = 0;
+            #print("STANDBY: bat_voltage {} ".format(bat_voltage))     
+        elif BMS_state == BMS_DISCHARGING:
+            if bat_voltage > MIN_DISCHARGE_VOLTAGE:
+                #current_ref = -current_ref;
+                #                    print("DISCHARGING: bat_voltage {} at {} current ".format(bat_voltage , self.current_ref))     
+                self.current_ref = self.current_ref 
             else:
-                CB.setRefPower(myBMS,0)
-            
-            #current_ref =  power_ref / (bat_voltage + DIVISION_FIX)
-            current_ref_ctrl = CB.calcInvRef(myBMS)
-            #print("Current ref {}".format(current_ref_ctrl))
-    #        self.current_ref = 0.25 * self.current_ref + 0.75 * current_ref_ctrl
-            self.current_ref = current_ref_ctrl
-            if self.current_ref > self.battery.get_charge_limit():
-                self.current_ref = self.battery.get_charge_limit()
-            if BMS_state == BMS_STANDBY:
-                self.current_ref = 0;
-                #print("STANDBY: bat_voltage {} ".format(bat_voltage))     
-            elif BMS_state == BMS_DISCHARGING:
-                if bat_voltage > MIN_DISCHARGE_VOLTAGE:
-                    #current_ref = -current_ref;
-                    #                    print("DISCHARGING: bat_voltage {} at {} current ".format(bat_voltage , self.current_ref))     
-                    self.current_ref = self.current_ref 
-                else:
-                    self.current_ref = self.current_ref 
-                    #current_ref =0
+                self.current_ref = self.current_ref 
+                #current_ref =0
 #                    print("DISCHARGING low voltage: bat_voltage {} at {} current ".format(bat_voltage , self.current_ref))  
-                    #print("DISCHARGING at low voltage");
-            elif BMS_state == BMS_CHARGING:
-                if bat_voltage <= MIN_DISCHARGE_VOLTAGE:
-                    #current_ref = self.battery.get_charge_limit();
+                #print("DISCHARGING at low voltage");
+        elif BMS_state == BMS_CHARGING:
+            if bat_voltage <= MIN_DISCHARGE_VOLTAGE:
+                #current_ref = self.battery.get_charge_limit();
 #                    print("CHARGING low voltage: bat_voltage {} at {} current ".format(bat_voltage , self.current_ref))  
-                    self.current_ref = self.current_ref 
-                    #print("CHARGING at low voltage")
+                self.current_ref = self.current_ref 
+                #print("CHARGING at low voltage")
 #                else:
 #                    print("CHARGING: bat_voltage {} at {} current_ref ".format(bat_voltage , self.current_ref))  
-                    #print("Charging")
-            else:
-                #print(":UNKNOWN state - bat_voltage {} at {} current ".format(bat_voltage , self.current_ref))  
-                print("UNKNOWN state??? -> standby")
-                self.current_ref = 0;
-                self.set_BMS_state(BMS_STANDBY)
-            
-            self.battery.update_stack_simulation(self.current_ref)
-            self.inverter_obj.set_DC_power(self.battery.get_stack_power())
-            CB.setMeasurements(myBMS, self.battery.get_stack_current(), 
-                                      self.battery.get_stack_voltage(),
-                                      self.battery.get_stack_power(),
-                                      self.battery.get_pressure(),
-                                      self.battery.get_state_of_charge(),
-                                      self.battery.get_stack_temperature(),
-                                      self.battery.get_flowrate());
+                #print("Charging")
+        else:
+            #print(":UNKNOWN state - bat_voltage {} at {} current ".format(bat_voltage , self.current_ref))  
+            print("UNKNOWN state??? -> standby")
+            self.current_ref = 0;
+            self.set_BMS_state(BMS_STANDBY)
+        
+        self.battery.update_stack_simulation(self.pump_positive.get_pump_duty(),
+                                             self.pump_negative.get_pump_duty(),
+                                             self.current_ref);
+        self.inverter_obj.set_DC_power(self.battery.get_stack_power())
+        CB.setMeasurements(myBMS, self.battery.get_stack_current(), 
+                                  self.battery.get_stack_voltage(),
+                                  self.battery.get_stack_power(),
+                                  self.battery.get_pressure(),
+                                  self.battery.get_state_of_charge(),
+                                  self.battery.get_stack_temperature(),
+                                  self.battery.get_flowrate());
 
-            self.Rs, self.Rp, self.Cp, self.OCV, V_hat = myBMS.RLSEstimator.RLS_run(myBMS.U_meas,myBMS.I_meas)
+        # self.Rs, self.Rp, self.Cp, self.OCV, V_hat = myBMS.RLSEstimator.RLS_run(myBMS.U_meas,myBMS.I_meas)
 #        print('Estimated parameters: Rs = {}, Rp = {}, Cp = {}'.format(Rs,Rp,Cp))
 #        print('Estimated OCV = {}'.format(OCVhat))
 #        print('True internal resistance = {}, true cap = {}'.format(self.battery.R_1,self.battery.C))
@@ -639,7 +598,7 @@ def randvalue(minrange, maxrange):
 def Read_Ctrl_BMS          (Value):
 	return (active_BMS.BMS_state);
 def Read_SOC               (Value):
-	return int15(active_BMS.get_battery_soc());
+	return int15(active_BMS.battery.CombinedModel.GetSOC());
 def Read_P_ref             (Value):
 	return int15(active_BMS.get_power_reference());
 def Read_GaussVolt         (Value):
@@ -655,23 +614,27 @@ def Read_Stack_voltage     (Value):
 def Read_Chlorine          (Value):
 	return (randvalue(0,30000));            ###@TODO
 def Read_Temp_anolyte      (Value):
-    return (randvalue(23,25));            ###@TODO
+    out = active_BMS.battery.CombinedModel.GetTemps()
+    return int15(out[0])
 def Read_Temp_anolyte_In   (Value):
-	return (randvalue(23,25));            ###@TODO
+    out = active_BMS.battery.CombinedModel.GetTemps()
+    return int15(out[1]);            ###@TODO
 def Read_Flow_Anolyte      (Value):
-	return (randvalue(3,50));            ###@TODO
+    return int15(active_BMS.battery.CombinedModel.GetAnoFlows()) # Check that units are correct (currently l/s)
 def Read_Pressure_Anolyte  (Value):
-    return (randvalue(0,5));            ###@TODO
+    return int15(AtmPres-active_BMS.battery.CombinedModel.GetAnoPressure_Pump()); # Check that units are correct (currently mbar)
 def Read_Speed_Anolyte     (Value):
     return int15(active_BMS.get_positive_pump_speed());
 def Read_Temp_catholyte    (Value):
-    return (randvalue(23,25));            ###@TODO
+    out = active_BMS.battery.CombinedModel.GetTemps()
+    return int15(out[0])
 def Read_Temp_catholyte_In (Value):
-	return (randvalue(23,25));            ###@TODO
+    out = active_BMS.battery.CombinedModel.GetTemps()
+    return int15(out[2])            
 def Read_Flow_catholyte    (Value):
-	return (randvalue(3,50));            ###@TODO
+	return int15(active_BMS.battery.CombinedModel.GetCatFlows())             # Check that units are correct (currently l/s)
 def Read_Pressure_catholyte(Value):
-	return (randvalue(0,5));            ###@TODO
+	return int15(AtmPres-active_BMS.battery.CombinedModel.GetCatPressure_Pump()); # Check that units are correct (currently mbar)
 def Read_Speed_catholyte   (Value):
 	return int15(active_BMS.get_positive_pump_speed());
 def Read_DC_DC_ON          (Value):
@@ -715,14 +678,16 @@ def Read_Time_contraction  (Value):
 def Read_Simulation_clock  (Value):
 	return (Value);
 def Read_thermal_temp_catholyte (value):
-	return (randvalue(23,25));      
+    out = active_BMS.battery.CombinedModel.GetTemps()
+    return int15(out[0])   
 def Read_thermal_temp_anolyte   (value):
-	return (randvalue(23,25));      
+    out = active_BMS.battery.CombinedModel.GetTemps()
+    return int15(out[0])      
 def read_anolyte_pressure_out   (value):
-	return (randvalue(0,5));      
+	return int15(AtmPres-active_BMS.battery.CombinedModel.GetAnoPressure_Stack());      
 def read_catholyte_pressure_out (value):
-	return (randvalue(0,5));      
-def read_anolythe_temp_out      (value):
+	return int15(AtmPres-active_BMS.battery.CombinedModel.GetCatPressure_Stack());      
+def read_anolyte_temp_out      (value):
 	return (randvalue(23,25));      
 def read_catholyte_temp_out     (value):
 	return (randvalue(23,25));      
@@ -782,7 +747,7 @@ read_function_switch_statement = {
     Reg_thermal_temp_anolyte    :Read_thermal_temp_anolyte  ,
     reg_anolyte_pressure_out    :read_anolyte_pressure_out  ,
     reg_catholyte_pressure_out  :read_catholyte_pressure_out,
-    reg_anolythe_temp_out       :read_anolythe_temp_out     ,
+    reg_anolyte_temp_out        :read_anolyte_temp_out     ,
     reg_catholyte_temp_out      :read_catholyte_temp_out    ,
     reg_rs_est                  :Read_Rs_est, 
     reg_rp_est                  :Read_Rp_est, 
@@ -864,7 +829,7 @@ class CustomDataBlock(ModbusSparseDataBlock):
             else:
                 current_value = 0
             super(CustomDataBlock, self).setValues(current_address, int(current_value)) 
-            #print("Read {} at {} ".format(current_value , current_address))
+            print("Read {} at {} ".format(current_value , current_address))
         return super(CustomDataBlock, self).getValues(address, count)
     def setValues(self, address, value):
         """ Sets the requested values of the datastore

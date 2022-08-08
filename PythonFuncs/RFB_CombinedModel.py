@@ -25,16 +25,18 @@ class RFB_CombinedModel:
         
     def Model_Timestep(self,w_ano,w_cat,I):
         
+        cubichrtocubicsec = 1/3600
+        
         #Simulate the anolyte circuit
         aVals  = self.AnoModel.GetVals()
         aOut = self.AnoModel.NumbaStep(aVals[0],aVals[1],float(w_ano))
         self.AnoModel.SetVals(aOut[0],aOut[1],aOut[2])
-        qAno = float(aOut[0].flatten())*0.000277777778 # Convert m3/hr to m3/s
+        qAno = float(aOut[0].flatten())*cubichrtocubicsec # Convert m3/hr to m3/s
         
         cVals  = self.CatModel.GetVals()
         cOut = self.CatModel.NumbaStep(cVals[0],cVals[1],float(w_cat))
         self.CatModel.SetVals(cOut[0],cOut[1],cOut[2])
-        qCat = float(cOut[0].flatten())*0.000277777778 # Convert m3/hr to m3/s
+        qCat = float(cOut[0].flatten())*cubichrtocubicsec # Convert m3/hr to m3/s
         
         
         tVals = np.array([self.TModel.GetTemps()],dtype=np.float64).flatten()
@@ -59,27 +61,44 @@ class RFB_CombinedModel:
         return self.TModel.GetTemps()
     
     def GetVoltage(self):
-        return self.EModel.GetVoltage(self.TModel.T_s)
+        return self.EModel.GetVoltage(self.TModel.T_s)*self.EModel.N
         
     def GetSOC(self):
         return self.EModel.GetSOC()
       
     def GetAnoFlows(self):
+        cubichrtolitersec = 1/3.6
         out = self.AnoModel.GetVals()
-        return out[1] 
+        return out[0]*cubichrtolitersec
         
     def GetCatFlows(self):
+        cubichrtolitersec = 1/3.6 
         out = self.CatModel.GetVals()
-        return out[1]
+        return out[0]*cubichrtolitersec
         
     def GetAnoPressures(self):
-        out = self.AnoModel.GetVals()
-        return out[2]
+        out = self.AnoModel.GetVals() # Returns a tuple
+        return out[2] # Returns an array of pressures
+    
+    def GetAnoPressure_Stack(self):
+        out = self.GetAnoPressures()
+        return out[1]*1000 # return stack pressure in millibar
+    
+    def GetAnoPressure_Pump(self):
+        out = self.GetAnoPressures()
+        return out[-1]*1000 # return stack pressure in millibar
         
     def GetCatPressures(self):
-        out = self.CatModel.GetVals()
-        return out[2]
-        
+        out = self.CatModel.GetVals() # Returns a tuple
+        return out[2] #Returns array of pressures
+    
+    def GetCatPressure_Stack(self):
+        out = self.GetCatPressures()
+        return out[1]*1000 # return stack pressure in millibar
+    
+    def GetCatPressure_Pump(self):
+        out = self.GetCatPressures()
+        return out[-1]*1000 # return stack pressure in millibar
         
         
 if __name__ == "__main__": # Unit tests, run only if executing this file as main window
@@ -90,11 +109,12 @@ if __name__ == "__main__": # Unit tests, run only if executing this file as main
     Rstack = 0.073
     c_total = 2500
     
+    CombinedModel = RFB_CombinedModel(Ts_sim, Rstack, 30, c_total)
+    
     simtime = 4
     simlen = round(simtime*3600/Ts_sim)
     taxis = np.linspace(0,simtime,simlen)
             
-    CombinedModel = RFB_CombinedModel(Ts_sim, Rstack, 30, c_total)
     
     ano_qCvec = np.zeros([1,simlen])
     ano_qvec = np.zeros([5,simlen])
