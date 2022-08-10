@@ -16,15 +16,15 @@ from numba import njit, jit
 class RFB_FD_ThermalModel: 
     def __init__(self,Rstack,T_ambient,Tsample_extern,Tsample_intern):
         self.Rstack = Rstack
-        self.Vstack = 0.02 # Stack volume in m^3
+        self.Vstack = 0.01 # Stack volume in m^3
         self.Vtanks = 0.05 # Tank volumes (assumed equal) in m^3
         self.T_air = T_ambient # Ambient temperature
         # self.T_a = self.T_air  # Anolyte temperature
         # self.T_c = self.T_air  # Catholyte temperature
         # self.T_s = self.T_air  # Stack temperature
-        self.T_a = 55  # Anolyte temperature
-        self.T_c = 55  # Catholyte temperature
-        self.T_s = 55  # Stack temperature
+        self.T_a = 50  # Anolyte temperature
+        self.T_c = 50  # Catholyte temperature
+        self.T_s = 50  # Stack temperature
         # self.rho = 1.354 # Electrolyte density in g/cm3 
         self.rho = 1310000 # Electrolyte density in g/m^3
         self.Cp = 3.2 # Specific heat capacity of electrolyte, J/(g*K)^-1
@@ -61,12 +61,14 @@ class RFB_FD_ThermalModel:
                     dStack = Cp*rho*(Qplus*(T_a-T_s)+Qminus*(T_c-T_s))+(I**2)*Rstack
                     T_s += dStack/(Cp*rho*Vstack)*Ts_int
                     
-                    dAno = Qplus*Cp*rho*(T_s-T_a)+UA*(T_air-T_a)
-                    T_a += dAno/(Cp*rho*Vtanks)*Ts_int
+                    # dAno = Qplus*Cp*rho*(T_s-T_a)+UA*(T_air-T_a)
+                    # T_a += dAno/(Cp*rho*Vtanks)*Ts_int
                     
-                    dCat = Qminus*Cp*rho*(T_s-T_c)+UA*(T_air-T_c)
-                    T_c += dCat/(Cp*rho*Vtanks)*Ts_int
+                    # dCat = Qminus*Cp*rho*(T_s-T_c)+UA*(T_air-T_c)
+                    # T_c += dCat/(Cp*rho*Vtanks)*Ts_int
                 
+                    # Assuming tanks are kept at constant temperature for now
+                    T_a = T_a; T_c = T_c;
                 Tvec = [T_s,T_a,T_c]
                 return Tvec
                     

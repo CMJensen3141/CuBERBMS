@@ -3,6 +3,8 @@
 Created on Mon Aug  8 09:41:20 2022
 
 @author: chris
+This file implements a combined electro-thermo-hydraulic model of a redox flow battery. 
+In theory, it is compatible with any battery chemistry with an underlying 4-species, single-electron redox reaction.
 """
 
 import RFB_ElectroChemModel as ElectricModel
@@ -32,11 +34,15 @@ class RFB_CombinedModel:
         aOut = self.AnoModel.NumbaStep(aVals[0],aVals[1],float(w_ano))
         self.AnoModel.SetVals(aOut[0],aOut[1],aOut[2])
         qAno = float(aOut[0].flatten())*cubichrtocubicsec # Convert m3/hr to m3/s
+        if qAno < 0:
+            qAno = float(0)
         
         cVals  = self.CatModel.GetVals()
         cOut = self.CatModel.NumbaStep(cVals[0],cVals[1],float(w_cat))
         self.CatModel.SetVals(cOut[0],cOut[1],cOut[2])
         qCat = float(cOut[0].flatten())*cubichrtocubicsec # Convert m3/hr to m3/s
+        if qCat < 0:
+            qCat = float(0)
         
         
         tVals = np.array([self.TModel.GetTemps()],dtype=np.float64).flatten()
@@ -51,12 +57,10 @@ class RFB_CombinedModel:
         
     def GetCellsConc(self):
         return self.EModel.GetCells()
-    
-        
+
     def GetTanksConc(self):
         return self.EModel.GetTanks()
-        
-        
+           
     def GetTemps(self):
         return self.TModel.GetTemps()
     
@@ -131,10 +135,10 @@ if __name__ == "__main__": # Unit tests, run only if executing this file as main
     for ii in range(0,simlen):
         if ii > simlen/2:
             w_ano = 100
-            w_cat = 50
+            w_cat = 100
             I = -150
         else:
-            w_ano = 50
+            w_ano = 100
             w_cat = 100
             I = 150
         CombinedModel.Model_Timestep(w_ano,w_cat,I)

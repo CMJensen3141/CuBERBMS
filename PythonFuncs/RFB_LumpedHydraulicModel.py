@@ -52,16 +52,16 @@ if __name__ == "__main__": # Unit tests, run only if executing this file as main
     import numpy as np
     
     viscosity = 0.006
-    permeability = 1.685-10
+    permeability = 1.685e-10
     density = 1400
     length = 0.26
     width = 0.30
     depth = 3e-03
-    Nseries = 15
+    Nseries = 19
     
     PascalToBar = 1e-5
     
-    FlowController = CF.PID(0.005,0.001,0,0,0.1,0)
+    FlowController = CF.PID_Backcal(0.005,0.001,0,0,0.1,0)
     
     
     LumpedModel = RFB_LumpedHydraulicModel(viscosity,permeability,density,length,width,depth,Nseries)
@@ -80,7 +80,7 @@ if __name__ == "__main__": # Unit tests, run only if executing this file as main
     Q = np.empty(numiters)
     
     for ii in range(0,numiters):
-        FlowRate = FlowController.run(ii,0.5,LumpedModel.Get_StackPressure(),FlowRate)
+        FlowRate = FlowController.run(ii+1,0.5,LumpedModel.Get_StackPressure(),FlowRate)
         LumpedModel.Model_Timestep(FlowRate)
         dP[ii] = LumpedModel.Get_StackPressure()
         Q[ii] = FlowRate

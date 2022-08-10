@@ -26,7 +26,24 @@ class GraphHydraulicModel:
         self.dP = np.array([0,0,0,0,0]).reshape(5,1) # Define the pressure vector
         self.Ts_extern = Ts_extern # Define the overall sampling time
         self.Ts_intern = Ts_intern # Define the internal sampling time to avoid stiffness issues
+        self.KozCar = 5 #Kozeny-Carman constant
+        self.length = 0.26 # Electrode length (m)
+        self.area = 0.0875 # Electrode area (m^2)
+        self.viscosity = 4.928e-8 # Fluid viscosity (bar*s)
+        self.fibdiam =  11e-6 # Mean fiber diameter (m)
+        self.porosity = 0.68 # Electrode porosity (unitless)
+        
+        self.perm = (self.fibdiam**2*self.porosity**3)/(self.KozCar*(1-self.porosity)**2) # Calculate the permeability coefficient
+        
+        self.Rcell = 0.3*(self.viscosity*self.length)/(self.perm*self.area) # Calculate the hydraulic resistance from Darcy's Law [unit = bar/(m^3/s)]
+
+        
+        
+        
+        
         self.NumbaStep = self.NumbaGenerator()
+        
+
         
     def PipeFun(self,q):
         res = np.multiply(self.Kp,q)
@@ -60,7 +77,7 @@ class GraphHydraulicModel:
             
     def NumbaGenerator(self):
         Kp = self.Kp.astype(np.float64); B = self.B.astype(np.float64); J = self.J.astype(np.float64); G = self.G.astype(np.float64); Ts_int = self.Ts_intern; Ts_ext = self.Ts_extern; # Local copies of necessary static variables
-        BT = B.T.astype(np.float64); S = np.array([0,1,0,0,0]).reshape(5,1)
+        BT = B.T.astype(np.float64); S = np.array([0,1,0,0,0]).reshape(5,1); Rcell = self.Rcell
         
         if math.ceil(Ts_ext/Ts_int) > 1:
             numsteps = math.ceil(Ts_ext/Ts_int)
@@ -81,7 +98,8 @@ class GraphHydraulicModel:
                     q = q.astype(np.float64)
                     for ii in range(0,numsteps):
                         rp = np.multiply(Kp,q)
-                        rs = (39.089+(q[1]*0.06)*27.868 + np.multiply(0.063*np.absolute(q[1]*0.06),(q[1]*0.06)))/1000
+                        # rs = (39.089+(q[1]*0.06)*27.868 + np.multiply(0.063*np.absolute(q[1]*0.06),(q[1]*0.06)))/1000 # Visblue polynomial from deliverable
+                        rs = Rcell*q[1]/3600 # Using Darcy's Law and best guess at porous membrane resistance
                         rs = np.multiply(S,rs)
                         r_pump = G @ -(0.0001*(w*w)+0.0004*w*q[-1]-0.0355*np.absolute(q[-1])*q[-1])
                         r_pump = r_pump.reshape(5,1)

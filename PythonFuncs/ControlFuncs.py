@@ -8,7 +8,7 @@ Created on Mon Feb  8 02:32:31 2021
 import numpy as np
 import math as math
 
-class PID:
+class PID_Backcal:
     def __init__(self,Kp,Ki,Kd,beta,gamma,MV_init):
         self.Kp = Kp
         self.Ki = Ki
@@ -21,14 +21,17 @@ class PID:
         self.MV_init = MV_init
         self.MV = MV_init
         self.eDPrev = 0
-        self.tPrev = -100
+        self.tPrev = 0
         
     def run(self,t,SP,PV,MV_actual):
         
         eD = self.gamma*SP-PV # Calculate weighted error
         dt = t-self.tPrev # Calculate time difference
         
-        self.I = MV_actual-self.MV_init-self.P-self.D # Back-calculate integral part
+        if self.Ki != 0:
+            self.I = MV_actual-self.MV_init-self.P-self.D # Back-calculate integral part if there's an integral gain
+        else:
+            self.I = 0
         
         self.P = self.Kp*(self.beta*SP-PV) # Proportional part
         self.I += self.Ki*(SP-PV)*dt # Integral part (incremental)
@@ -37,6 +40,41 @@ class PID:
         
         self.eDPrev = eD #Update error
         self.tPrev = t # Update time
+        
+        return self.MV
+    
+class PID:
+    def __init__(self,Kp,Ki,Kd,poslim,neglim,MV_init):
+        self.Kp = Kp
+        self.Ki = Ki
+        self.Kd = Kd
+        self.poslim = poslim
+        self.neglim = neglim
+        self.P = 0
+        self.I = 0
+        self.D = 0
+        self.ePrev = 0
+        self.tPrev = 0
+        self.MV = MV_init
+        
+    def run(self,t,SP,PV):
+    
+        e = SP-PV
+        dt = t-self.tPrev # Calculate time difference
+        
+        self.P = self.Kp*e # Proportional part
+        if self.I > self.poslim:
+            self.I = self.poslim
+        elif self.I < self.neglim:
+            self.I = self.neglim
+        else:
+            self.I += self.Ki*e*dt # Integral part (incremental)
+        self.D = self.Kd*(e-self.ePrev)/dt # Derivative part
+        self.MV = self.P+self.I+self.D # Calculate output
+        
+        self.ePrev = e #Update error
+        self.tPrev = t # Update time
+
         
         return self.MV
     
