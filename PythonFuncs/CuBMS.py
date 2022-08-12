@@ -18,7 +18,7 @@ class CuBMS:
         self.FFController = CF.PID_Backcal(0.1,0.01,0,0,0,0)
         self.MinTempController = CF.PID_Backcal(0.1,0.1,0,1,0,0)
         self.MaxTempController = CF.PID_Backcal(0.1,0.1,0,1,0,0)
-        self.StackTempController = CF.PID(33,0.1,0,100,-100,0)
+        self.StackTempController = CF.PID(33,2,0,100,-100,0)
         self.MinPressureController = CF.PID_Backcal(0.1,0.01,0,1,0,0)
         self.MaxPressureController = CF.PID_Backcal(0.1,0.01,0,1,0,0)
         self.InvRefPID = CF.PID_Backcal(0.01, 0.0001, 0, 1, 0, 0)

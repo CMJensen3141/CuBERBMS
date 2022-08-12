@@ -35,7 +35,7 @@ class GraphHydraulicModel:
         
         self.perm = (self.fibdiam**2*self.porosity**3)/(self.KozCar*(1-self.porosity)**2) # Calculate the permeability coefficient
         
-        self.Rcell = 0.3*(self.viscosity*self.length)/(self.perm*self.area) # Calculate the hydraulic resistance from Darcy's Law [unit = bar/(m^3/s)]
+        self.Rcell = 0.2*(self.viscosity*self.length)/(self.perm*self.area) # Calculate the hydraulic resistance from Darcy's Law [unit = bar/(m^3/s)]
 
         
         

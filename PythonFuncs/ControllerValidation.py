@@ -27,7 +27,7 @@ BMS_PumpMax = 10   # Flow in [l/s]
 BMS_PumpMin = 0.0  # Flow in [l/s]
 
 Ts = 1
-Rstack = 0.1
+Rstack = 1.5
 T_ambient = 25
 c_total = 2500
 
@@ -62,7 +62,7 @@ RestTicker = 0
 
 
 myBMS.Mode = 1 # Set to charge initially
-myBMS.setRefPower(1500) # 1kW initial power reference
+myBMS.setRefPower(2500) # 1kW initial power reference
 myBMS.setRefTemp(55) # 55 degree desired stack temperature
 
 for ii in range(0,simlen):
@@ -81,16 +81,16 @@ for ii in range(0,simlen):
         if RestTicker > 600/Ts:
             RestTicker = 0
             myBMS.Mode = -1 # Set to discharge
-            myBMS.setRefPower(-1500)
+            myBMS.setRefPower(-2500)
     if SOC[0,ii] <= 0.01 and myBMS.Mode == -1:
         RestTicker += 1
         if RestTicker > 600/Ts:
             RestTicker = 0
             myBMS.Mode = 1 # Set to charge
-            myBMS.setRefPower(1500)
+            myBMS.setRefPower(2500)
     
     if ii > simlen/2:
-        myBMS.setRefTemp(51)
+        myBMS.setRefTemp(53)
     
     Temps = BatteryModel.GetTemps()
     T_stack[0,ii] = Temps[0]; T_ano[0,ii] = Temps[1]; T_cat[0,ii] = Temps[2];
