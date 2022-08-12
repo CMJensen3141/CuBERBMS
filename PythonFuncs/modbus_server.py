@@ -33,7 +33,10 @@ BMS_PumpMin = 0.0  # Flow in [m^3/h]
 
 AtmPres = 1000 # Atmospheric pressure in mbar
 
-myBMS = CB.CuBMS(BMS_Lim_max, BMS_Lim_min, BMS_I_max, BMS_I_min, BMS_I_tog, BMS_PumpMax, BMS_PumpMin,BMS_EstMode)
+TimeStep = 100 # Step size in simulation is 1 second
+Speed_Factor = 60 # Simulation speed-up factor
+
+myBMS = CB.CuBMS(BMS_Lim_max, BMS_Lim_min, BMS_I_max, BMS_I_min, BMS_I_tog, BMS_PumpMax, BMS_PumpMin,BMS_EstMode,TimeStep)
 #TempRegulator = CF.PID(0.01,0.05,0,0,0.1,0)
 #BatteryModel = mbs.Sim_BMS()
 
@@ -226,9 +229,9 @@ class Sim_pump(object):
         self.pump_running = False
         self.max_speed = 3000
     def get_pump_speed(self):
-        return(self.pump_speed)
+        return float(self.pump_speed)
     def get_pump_duty(self):
-        return (self.get_pump_speed()/self.max_speed)*100
+        return float((self.get_pump_speed()/self.max_speed)*100)
     def set_pump_speed(self,speed):
         if speed < 0:
             speed = 0
@@ -236,11 +239,11 @@ class Sim_pump(object):
             speed = self.max_speed
         self.pump_speed = speed
     def set_pump_duty(self,duty):
-        if duty < 0:
-            duty = 0
-        if duty > 100:
-            duty = 100
-        self.pump_speed = (self.max_speed*duty)/100
+        if duty < 0.0:
+            duty = 0.0
+        if duty > 100.0:
+            duty = 100.0
+        self.pump_speed = (self.max_speed*duty)/100.0
     def start_pump(self):
         self.pump_running = True
         self.set_pump_speed(self.max_speed)
@@ -260,8 +263,8 @@ class Sim_battery(object):
         
         self.UMax = 72;
         self.UMin = 2;
-        CB.setUMax = self.UMax
-        CB.setUMin = self.UMin
+        myBMS.setUMax = self.UMax
+        myBMS.setUMin = self.UMin
         self.V_dc = self.cell_voltage*self.cell_number #rated voltage 
         self.E_tank = 50 * kWh_to_J #value in Joule from 25 kWh
         self.E_tank_kWh = self.E_tank/kWh_to_J
@@ -272,14 +275,15 @@ class Sim_battery(object):
         self.C =  self.E_tank/(4*self.R_1*self.P_max) 
         self.time_const = self.R_1*self.C
         self.Q_tank = self.C* self.V_dc
-        self.dt = 60 #delta t in seconds
+        self.dt = TimeStep #delta t in seconds
+        self.SpeedUp = Speed_Factor
         # self.iternum = 100/self.dt
-        CB.setTimeStep(myBMS, self.dt)
+        myBMS.setTimeStep(self.dt)
         
         self.chargingEnabled = False
         self.charging = True #if true we are charging, if false we are discharging (standby if chargingEnabled == false)
         self.battery_state = BATTERY_STANDBY
-        CB.setChargeMode(myBMS, CB.BMS_IDLE)
+        myBMS.setChargeMode(CB.BMS_IDLE)
         self.current_threshold = 0.5 #Amperes
         self.Charge_limit = 150 #A
         self.Discharge_limit = -150 #A
@@ -314,11 +318,12 @@ class Sim_battery(object):
             if self.CombinedModel.GetSOC() <= self.SOC_MIN:
                 self.chargingEnabled = False #no undercharging
                 Icharge = 0
-                print("MIN SOC reached")
+                print("I think the current SOC is " + str(self.CombinedModel.GetSOC()))
             
         self.CombinedModel.Model_Timestep(w_ano,w_cat,Icharge)
         self.V_stack = self.CombinedModel.GetVoltage(); 
         self.set_stack_current(Icharge)
+        self.set_state_of_charge(self.CombinedModel.GetSOC())
 
         
     def get_stack_voltage(self):
@@ -335,6 +340,15 @@ class Sim_battery(object):
         return(self.stack_temperature)
     def get_charge_limit(self):
         return (self.Charge_limit)
+    
+    def set_state_of_charge(self,soc):
+        self.SOC = soc
+    
+    def get_speedup_factor(self):
+        return self.SpeedUp
+    
+    def set_speedup_factor(self,speedup):
+        self.SpeedUp = speedup
 
     def set_battery_state(self, new_state):
         if new_state == BATTERY_STANDBY:
@@ -440,15 +454,15 @@ class Sim_BMS(object):
         return int(self.power_reference)
     def start_charging(self):
         print("start charging")
-        self.pump_negative.stop_pump()
-        self.pump_positive.stop_pump()
+        self.pump_negative.set_pump_duty(100)
+        self.pump_positive.set_pump_duty(100)
         self.inverter_obj.set_DC_power(abs(self.power_reference))
         self.inverter_obj.set_inverter_state (INVERTER_CHARGING)
         self.battery.set_battery_state(BATTERY_CHARGING)
         #BMS_CHARGING_MODE = 1;
         #BMS_DISCHARGING_MODE = -1;
         #BMS_IDLE = 0;
-        CB.setChargeMode(myBMS,CB.BMS_CHARGING_MODE)
+        myBMS.setChargeMode(CB.BMS_CHARGING_MODE)
         self.BMS_state = BMS_CHARGING
     def stop_charger(self):
         print("stop charger")
@@ -457,16 +471,16 @@ class Sim_BMS(object):
         self.inverter_obj.set_DC_power(0.0)
         self.inverter_obj.set_inverter_state (INVERTER_STANDBY)
         self.battery.set_battery_state(BATTERY_STANDBY)
-        CB.setChargeMode(myBMS,CB.BMS_IDLE)
+        myBMS.setChargeMode(CB.BMS_IDLE)
         self.BMS_state = BMS_STANDBY
     def start_discharging(self):
         print("start discharging")
-        self.pump_negative.stop_pump()
-        self.pump_positive.stop_pump()
+        self.pump_negative.set_pump_duty(100)
+        self.pump_positive.set_pump_duty(100)
         self.inverter_obj.set_DC_power(-abs(self.power_reference))
         self.inverter_obj.set_inverter_state (INVERTER_DISCHARGING)
         self.battery.set_battery_state(BATTERY_DISCHARGING)
-        CB.setChargeMode(myBMS,CB.BMS_DISCHARGING_MODE)
+        myBMS.setChargeMode(CB.BMS_DISCHARGING_MODE)
         self.BMS_state = BMS_DISCHARGING
     def set_BMS_state(self, new_state):
         if new_state == BMS_STANDBY:
@@ -518,14 +532,14 @@ class Sim_BMS(object):
         #DIVISION_FIX = 0.001;
         #print("Power ref = {}".format(power_ref) )
         if BMS_state == BMS_DISCHARGING:
-            CB.setRefPower(myBMS,-power_ref)
+            myBMS.setRefPower(-power_ref)
         elif BMS_state == BMS_CHARGING:
-            CB.setRefPower(myBMS,power_ref)
+            myBMS.setRefPower(power_ref)
         else:
-            CB.setRefPower(myBMS,0)
+            myBMS.setRefPower(0)
         
         #current_ref =  power_ref / (bat_voltage + DIVISION_FIX)
-        current_ref_ctrl = CB.calcInvRef(myBMS)
+        current_ref_ctrl = myBMS.DummyCurrentRef()
         #print("Current ref {}".format(current_ref_ctrl))
 #        self.current_ref = 0.25 * self.current_ref + 0.75 * current_ref_ctrl
         self.current_ref = current_ref_ctrl
@@ -563,13 +577,18 @@ class Sim_BMS(object):
                                              self.pump_negative.get_pump_duty(),
                                              self.current_ref);
         self.inverter_obj.set_DC_power(self.battery.get_stack_power())
-        CB.setMeasurements(myBMS, self.battery.get_stack_current(), 
+        myBMS.setMeasurements(self.battery.get_stack_current(), 
                                   self.battery.get_stack_voltage(),
                                   self.battery.get_stack_power(),
                                   self.battery.get_pressure(),
                                   self.battery.get_state_of_charge(),
                                   self.battery.get_stack_temperature(),
                                   self.battery.get_flowrate());
+        
+        print("Positive pump: " + str(self.pump_positive.get_pump_duty()))
+        print("Negative pump: " +str(self.pump_negative.get_pump_duty()))
+        print("Current reference:" + str(self.current_ref))
+        
 
         # self.Rs, self.Rp, self.Cp, self.OCV, V_hat = myBMS.RLSEstimator.RLS_run(myBMS.U_meas,myBMS.I_meas)
 #        print('Estimated parameters: Rs = {}, Rp = {}, Cp = {}'.format(Rs,Rp,Cp))
@@ -598,7 +617,7 @@ def randvalue(minrange, maxrange):
 def Read_Ctrl_BMS          (Value):
 	return (active_BMS.BMS_state);
 def Read_SOC               (Value):
-	return int15(active_BMS.battery.CombinedModel.GetSOC());
+	return int15(active_BMS.battery.CombinedModel.GetSOC()*100);
 def Read_P_ref             (Value):
 	return int15(active_BMS.get_power_reference());
 def Read_GaussVolt         (Value):
@@ -606,7 +625,7 @@ def Read_GaussVolt         (Value):
 def Read_SOC_Gauss         (Value):
 	return (randvalue(0,100));            ###@TODO
 def Read_BMS_Error         (Value):
-	return (randvalue(0,1));            ###@TODO
+	return 0;            ###@TODO
 def Read_Stack_Current     (Value):
 	return int15(active_BMS.get_battery_current());
 def Read_Stack_voltage     (Value):
@@ -674,7 +693,7 @@ def Read_T_Thermal_tank    (Value):
 def Read_Simulation_mode   (Value):
 	return (Value);            ###@TODO
 def Read_Time_contraction  (Value):
-	return (Value);
+	return int15(active_BMS.battery.get_speedup_factor());
 def Read_Simulation_clock  (Value):
 	return (Value);
 def Read_thermal_temp_catholyte (value):
@@ -829,7 +848,7 @@ class CustomDataBlock(ModbusSparseDataBlock):
             else:
                 current_value = 0
             super(CustomDataBlock, self).setValues(current_address, int(current_value)) 
-            print("Read {} at {} ".format(current_value , current_address))
+            # print("Read {} at {} ".format(current_value , current_address))
         return super(CustomDataBlock, self).getValues(address, count)
     def setValues(self, address, value):
         """ Sets the requested values of the datastore
@@ -837,20 +856,26 @@ class CustomDataBlock(ModbusSparseDataBlock):
         :param address: The starting address
         :param values: The new values to be set
         """
+        #@TODO: Writeable registers need to be updated: check if any missing!
         super(CustomDataBlock, self).setValues(address, value)
 
         # whatever you want to do with the written value is done here,
         # however make sure not to do too much work here or it will
         # block the server, espectially if the server is being written
         # to very quickly
+        print("Made it this far in the write sequence!")
         for idx in range(len(value)):
             current_address = (address+idx) - 1
             if current_address == Reg_Ctrl_BMS:
+                print("Made it to the part where I write to the BMS state")
                 active_BMS.set_BMS_state(value[idx])
                 print("wrote {} at {} (BMS control)".format(value[idx], address+idx))                
             elif current_address ==  Reg_P_ref:
                 active_BMS.set_power_reference(float (value[idx]))
                 print("wrote {} at {} (p_ref)".format(value[idx], address+idx))
+            elif current_address ==  Reg_Time_contraction:
+                active_BMS.battery.set_speedup_factor(float (value[idx]))
+                print("wrote {} at {} (p_ref)".format(value[idx], address+idx))    
             else:
                 print("<wrote {} at {} >".format(value[idx], address+idx))
 

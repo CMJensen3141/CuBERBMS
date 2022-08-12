@@ -166,19 +166,20 @@ def run_sync_client():
     # client = ModbusClient(method='rtu', port='/dev/ptyp0', timeout=1,
     #                       baudrate=9600)
     client.connect()
-    register_to_write = 100;
-    num_measures = 100;
+    register_to_write = 100; # Start address of registers
+    num_measures = 100;  # Number of registers to read
 #    power = np.zeros(0)
 #    power = np.append(power, 1.0)
 #    power = np.append(power, 2.0)
 #    power = np.append(power, 3.0)
 #    print("{}".format(power))   
-    UNIT = 0x1
+    UNIT = 0x1 # Logic unit number
 
-    datalist = Read_Registers(HOLDING_REGISTER_COUNT, client, UNIT)
+    datalist = Read_Registers(HOLDING_REGISTER_COUNT, client, UNIT) # Test read
 
     #log.debug("Write to a holding register and read back")
     
+    # Test read an 
     try:
         rr = client.read_holding_registers(Reg_Ctrl_BMS, 1, unit=UNIT)
         if rr.function_code >= 0x80:

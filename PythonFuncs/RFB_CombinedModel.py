@@ -46,7 +46,7 @@ class RFB_CombinedModel:
         
         
         tVals = np.array([self.TModel.GetTemps()],dtype=np.float64).flatten()
-        tOut = self.TModel.NumbaStep(tVals[0],tVals[1],tVals[2],self.TModel.T_air,qAno,qCat,I)
+        tOut = self.TModel.NumbaStep(tVals[0],tVals[1],tVals[2],self.TModel.T_air,qAno,qCat,float(I))
         self.TModel.SetTemps(tOut[0], tOut[1], tOut[2])
         
         cellVals = self.EModel.GetCells()

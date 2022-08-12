@@ -176,7 +176,7 @@ class CuBMS:
         return self.PumpRef
         
     def DummyCurrentRef(self):
-        Iref = self.P_ref/self.U_meas
+        Iref = self.P_ref/(self.U_meas+0.001)
         if Iref > self.I_max:
             Iref = self.I_max
         elif Iref < self.I_min:

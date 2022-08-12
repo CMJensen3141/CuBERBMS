@@ -35,7 +35,10 @@ class PID_Backcal:
         
         self.P = self.Kp*(self.beta*SP-PV) # Proportional part
         self.I += self.Ki*(SP-PV)*dt # Integral part (incremental)
-        self.D = self.Kd*(eD-self.eDPrev)/dt # Derivative part
+        if dt == 0:
+            self.D = 0
+        else:
+            self.D = self.Kd*(eD-self.eDPrev)/dt # Derivative part
         self.MV = self.P+self.I+self.D # Calculate output
         
         self.eDPrev = eD #Update error
@@ -69,7 +72,10 @@ class PID:
             self.I = self.neglim
         else:
             self.I += self.Ki*e*dt # Integral part (incremental)
-        self.D = self.Kd*(e-self.ePrev)/dt # Derivative part
+        if dt == 0:
+            self.D = 0
+        else:
+            self.D = self.Kd*(e-self.ePrev)/dt # Derivative part
         self.MV = self.P+self.I+self.D # Calculate output
         
         self.ePrev = e #Update error
