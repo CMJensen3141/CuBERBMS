@@ -166,3 +166,5 @@ plt.subplot(3,1,3)
 plt.plot(taxis,pvec.flatten(),'--')
 plt.ylabel("Stack dP [mbar]")
 plt.xlabel("Time [hr]")  
+
+plt.show()
