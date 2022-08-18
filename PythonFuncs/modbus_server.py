@@ -43,13 +43,9 @@ log.setLevel(logging.ERROR)
 # Precalculations for battery and energy
 # --------------------------------------------------------------------------- #
 
-
-
-
 active_BMS = BMS.Sim_BMS()
 
 dummyvalue = 15.0
-
 
 def int15(floatvalue):
     value = int(floatvalue + 0.5)
@@ -226,7 +222,6 @@ read_function_switch_statement = {
 
         
         
-    
 #def read_fun_1():
 #    print ('R_Fun 1 ')
 #    return (1);

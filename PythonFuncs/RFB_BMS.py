@@ -12,6 +12,8 @@ import ControlFuncs as CF
 import RFB_CombinedModel as ComMod
 from bms_registers import * 
 from UnitConversions import *
+import modbus_class as mc
+import time
 
 # --------------------------------------------------------------------------- #
 # set invariant parameters of imported models
@@ -68,6 +70,69 @@ class Sim_Inverter(object):
         self.efficiency = 0.93
         self.inverter_ambient_temp = 40.0;
         self.inverter_internal_temp = self.inverter_ambient_temp 
+        self.SimStatus = False
+        self.converter = mc.Client()       
+        self.converterclient = 0
+        self.FirstRun = True
+        self.TimeStamp = -1
+
+    def OpenInverterConnection(self):
+        [cc,connected] = self.converter.connect_to_client()
+        self.converterclient = cc
+        return connected
+    
+    def CloseInverterConnection(self):
+        self.converterclient.disconnect_from_client()
+        
+    def InverterShutdown(self):
+        self.converter.stop_transmission()
+        self.CloseInverterConnection()
+        
+    def SetPowerRef(self,ref):
+        ref = abs(ref)
+        if self.inverter_state == INVERTER_CHARGING:
+            if self.FirstRun = True:
+                self.TimeStamp = time.time()
+                self.converter.charge_battery()
+                self.converter.start_transmission(ref)
+                self.FirstRun = False
+            else:
+                if (self.TimeStamp + 60) > time.time():
+                    self.converter.set_AC_power(ref)
+        elif self.inverter_state == INVERTER_DISCHARGING:
+            if self.FirstRun = True:
+                self.TimeStamp = time.time()
+                self.converter.discharge_battery()
+                self.converter.start_transmission(ref)
+                self.FirstRun = False
+            else:
+                if (self.TimeStamp + 60) > time.time():
+                    self.converter.set_AC_power(ref)
+        else:
+            print("Attempting to change power reference while in standby mode.")            
+        
+        
+    
+    print("Opening connection to Trumpf converter")
+    [converterclient,connected] = converter.connect_to_client() # Connect to the converter server
+    print(connected)
+    converter.charge_battery()
+    converter.start_transmission(100)
+    time.sleep(10)
+    print(str(converter.get_active_power()))
+    converter.set_AC_power(110)
+    time.sleep(10)
+    print(str(converter.get_active_power()))
+    time.sleep(10)
+    converter.stop_transmission()
+    converterclient.disconnect_from_client()
+    
+    def set_sim_status(self,status: bool):
+        if status == False or status == True:
+            self.SimStatus = status
+        else:
+            self.SimStatus = True
+            print("I only accept boolean variables: set_sim_status")
 
     def get_grid_current(self):
         self.grid_current = self.DC_power / self.grid_voltage
@@ -327,7 +392,6 @@ class Sim_BMS(object):
         return int(self.battery.get_stack_power())
     def get_battery_soc(self):
         return self.CombinedModel.GetSOC()
-        # return int(self.battery.get_state_of_charge() * J_to_Wh + 0.5) #Convertfor modbus
     def set_power_reference(self, new_reference):
         self.power_reference = new_reference
         return int(self.power_reference)
@@ -340,9 +404,6 @@ class Sim_BMS(object):
         self.inverter_obj.set_DC_power(abs(self.power_reference))
         self.inverter_obj.set_inverter_state (INVERTER_CHARGING)
         self.battery.set_battery_state(BATTERY_CHARGING)
-        #BMS_CHARGING_MODE = 1;
-        #BMS_DISCHARGING_MODE = -1;
-        #BMS_IDLE = 0;
         myBMS.setChargeMode(CB.BMS_CHARGING_MODE)
         self.BMS_state = BMS_CHARGING
     def stop_charger(self):
@@ -377,9 +438,6 @@ class Sim_BMS(object):
     def get_BMS_state(self):
         return (self.BMS_state)
         
-#    def update_simulation_(self):
-#        self.battery.update_stack_simulation()
-#        self.inverter_obj.set_DC_power(self.battery.get_stack_power())
     def set_simulation_dt(self, new_time_step):
         self.battery.set_battery_dt(float(new_time_step))
         return int(new_time_step)
@@ -387,9 +445,6 @@ class Sim_BMS(object):
     def get_simulation_dt(self):
         return self.battery.get_battery_dt()
     
-#    def update_simulation_cmj(self,Icharge):
-#        self.battery.update_stack_simulation_CMJ(Icharge)
-#        self.inverter_obj.set_DC_power(self.battery.get_stack_power())
     def get_simulation_time(self):
         return self.simulationTime
     
@@ -470,10 +525,5 @@ class Sim_BMS(object):
         print("Negative pump: " +str(self.pump_negative.get_pump_duty()))
         print("Current reference:" + str(self.current_ref))
         
-
-        # self.Rs, self.Rp, self.Cp, self.OCV, V_hat = myBMS.RLSEstimator.RLS_run(myBMS.U_meas,myBMS.I_meas)
-#        print('Estimated parameters: Rs = {}, Rp = {}, Cp = {}'.format(Rs,Rp,Cp))
-#        print('Estimated OCV = {}'.format(OCVhat))
-#        print('True internal resistance = {}, true cap = {}'.format(self.battery.R_1,self.battery.C))
-#        print('DC_current = {} , DC_power = {}'.format(self.get_DC_current(), self.battery.get_stack_power() ))
-#        print('CB.soc = {} '.format(myBMS.SOC))
+if __name__ == "__main__":
+    Test_Trumpf()
