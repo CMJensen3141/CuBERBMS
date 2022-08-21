@@ -21,11 +21,12 @@ logging.basicConfig(format=FORMAT)
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
 
-UNIT = 0x2 #Slave number
+# UNIT = 0x2 #Slave number
+UNIT = 2
 number_of_holding_regs = 20
 
 # Initializing Modbus Serial Client (RTU)
-client = ModbusSerialClient(method = "rtu", port="COM7",stopbits = 1, bytesize = 8, parity = 'N', baudrate= 9600, timeout=1)
+client = ModbusSerialClient(method = "rtu", port="COM3",stopbits = 1, bytesize = 8, parity = 'N', baudrate= 9600, timeout=1)
 
 # Connect to client
 def connect_rtu_client(client):
@@ -60,11 +61,11 @@ if __name__ == "__main__":
     client = connect_rtu_client(client)
 
 
-    wr = write_holding_registers(client, 8, 69, UNIT)
-    rr = read_holding_registers(client, 0, 9, unit=UNIT)
+    # wr = write_holding_registers(client, 8, 69, UNIT)
+    rr = read_holding_registers(client, 0, 9, unit=2)
 
-    assert(wr.function_code < 0x80)     # test that we are not an error
-    assert(rr.registers[8] == 69)    # test the expected value
+    # assert(wr.function_code < 0x80)     # test that we are not an error
+    # assert(rr.registers[8] == 69)    # test the expected value
    
-    print(wr)
+    # print(wr)
     print(rr)

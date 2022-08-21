@@ -12,13 +12,16 @@ import logging
 UNIT = 2 #Slave number
 
 # Initializing Modbus Serial Client (RTU)
-client = ModbusSerialClient(method = "rtu", port="COM4",stopbits = 1, bytesize = 8, parity = 'N', baudrate= 9600, timeout=1)
+client = ModbusSerialClient(method = "rtu", port="COM3",stopbits = 1, bytesize = 8, parity = 'N', baudrate= 9600, timeout=1)
 print(client.connect())
 
-client.write_register(address=8, value=1, unit=UNIT)
+client.write_register(address=8, value=0, unit=2)
 
-rr = client.read_holding_registers(address=0, count=9, unit=UNIT)
-print(rr)
+rr = client.read_holding_registers(address=0, count=9, unit=2)
+print("Load:", rr.registers)
+
+rr = client.read_holding_registers(address=0, count=9, unit=3)
+print("Slave:", rr.registers)
 
 
 
