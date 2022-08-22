@@ -159,14 +159,14 @@ class state_machine:
                 return False
             soc = read_single_register(self.client,self.unit,Reg_SOC)
             if soc[0] == True:
-                # print(str(soc[1]))
+                print(str(soc[1]))
                 if soc[1] >= 33:
                     if not write_single_register(self.client,self.unit,Reg_Ctrl_BMS, BMS_STANDBY):
                         self.state = STATE_ERROR
                         print("Write error during charging")
                     else:
                         self.state = STATE_PAUSE
-                        self.waitcounter = 50
+                        self.waitcounter = 1
             else:
                 self.state = STATE_ERROR
                 print("Read error B in during charging")
@@ -197,7 +197,7 @@ class state_machine:
                 self.state = STATE_ERROR
                 return False
             soc = read_single_register(self.client,self.unit,Reg_SOC)
-            # print("SOC is " + str(soc[1]))
+            print("SOC is " + str(soc[1]))
             if soc[0] == True:
                 if soc[1] <= 5:
                     if not write_single_register(self.client,self.unit,Reg_Ctrl_BMS, BMS_STANDBY):
@@ -264,9 +264,10 @@ def run_sync_client():
         [status,arr] = read_multiple_registers(HOLDING_REGISTER_COUNT, client, UNIT)
         datalist = np.append(datalist, arr.reshape(HOLDING_REGISTER_COUNT,1), axis=1)
         if (time.time() - WaitVar) >= 5:
-            write_single_register(client, UNIT, Reg_Load_Ref, RefVal)
-            if RefVal < 300:
-                RefVal += 10
+            write_single_register(client, UNIT, Reg_Load_Ref, int(RefVal/3))
+            write_single_register(client, UNIT, Reg_P_ref, RefVal)
+            if RefVal < 1000:
+                RefVal += 50
             WaitVar = time.time()
     # ----------------------------------------------------------------------- #
     # close the client
@@ -280,12 +281,15 @@ def run_sync_client():
 
 if __name__ == "__main__":
 
+
     data = run_sync_client()
     data = data.T
     dframe = pd.DataFrame(data, columns = RegNames)
     
-    dframe.plot(subplots = True, y = ["Reg_Stack_voltage","Reg_Stack_Current","Reg_P_ref","Reg_Load_Ref","Reg_Flow_Anolyte"])
+    dframe.plot(subplots = True, y = ["Reg_Stack_voltage","Reg_Stack_Current","Reg_P_ref","Reg_Load_Ref","Reg_Flow_Anolyte","Reg_AC_DC_GRID_POWER"])
     plt.show()
+
+    dframe.to_csv("BMS_LAB_TEST.csv")
     
 
 #    test=easygui.ynbox('Run test?', 'Title', ('Yes', 'No'))

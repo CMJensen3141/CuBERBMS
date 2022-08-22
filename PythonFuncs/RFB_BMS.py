@@ -41,6 +41,7 @@ TimeStep = 100 # Step size in simulation is 1 second
 Speed_Factor = 60 # Simulation speed-up factor
 
 MIN_DISCHARGE_VOLTAGE = 5; #do not discharge below this voltage level.
+MAX_CHARGE_VOLTAGE = 75 #do not charge above this voltage
 
 TEST_POWER_REFERENCE = 2500; #Watt
 
@@ -84,29 +85,33 @@ class Sim_Inverter(object):
         self.converterclient.disconnect_from_client()
         
     def InverterShutdown(self):
-        self.converter.stop_transmission()
+        self.converterclient.stop_transmission()
         self.CloseInverterConnection()
         
     def SetPowerRef(self,ref):
-        ref = abs(ref)
+        ref = int(abs(ref))
         if self.inverter_state == INVERTER_CHARGING:
             if self.FirstRun == True:
                 self.TimeStamp = time.time()
-                self.converter.charge_battery()
-                self.converter.start_transmission(ref)
+                self.converterclient.charge_battery()
+                print("First run power reference is" + str(ref))
+                self.converterclient.start_transmission(5000)
                 self.FirstRun = False
             else:
                 if (self.TimeStamp + 60) > time.time():
-                    self.converter.set_AC_power(ref)
+                    self.converterclient.set_constant_power(ref)
+                    print("NOT FIRST RUN power reference is" + str(ref))
         elif self.inverter_state == INVERTER_DISCHARGING:
             if self.FirstRun == True:
                 self.TimeStamp = time.time()
-                self.converter.discharge_battery()
-                self.converter.start_transmission(ref)
+                self.converterclient.discharge_battery()
+                self.converterclient.start_transmission(5000)
+                print("Power reference is" + str(ref))
                 self.FirstRun = False
             else:
                 if (self.TimeStamp + 60) > time.time():
-                    self.converter.set_AC_power(ref)
+                    self.converterclient.set_constant_power(ref)
+                    print("Power reference is" + str(ref))
         else:
             print("Attempting to change power reference while in standby mode.")            
         
@@ -299,6 +304,7 @@ class Sim_battery(object):
         self.SOC =0
         self.SOC_MAX = 0.95
         self.SOC_MIN = 0.05
+        self.DummySOC = 0
         
         self.FlowRate = 0 # Unit is L/s
         self.P_Cooling = 0 # Unit is W
@@ -310,15 +316,17 @@ class Sim_battery(object):
         self.sensors = Sensors()
         self.CombinedModel = ComMod.RFB_CombinedModel(self.dt, self.R_1, self.T_ambient, self.c_total)
         
-        self.SimStatus = True # Indicate whether we are simulating the battery dynamics
+        self.SimStatus = False # Indicate whether we are simulating the battery dynamics
+        self.Inverter.set_sim_status(False) # Indicate whether inverter is simulated
 
     def update_stack_simulation(self,w_ano,w_cat,Icharge):
 
-        if (self.charging == True):
+
+        if (self.charging == True and self.Inverter.SimStatus == True):
             if self.CombinedModel.GetSOC() >= self.SOC_MAX:
                 self.chargingEnabled = False #no overcharging
                 Icharge = 0
-        else:     
+        elif self.Inverter.SimStatus == True:     
             if self.CombinedModel.GetSOC() <= self.SOC_MIN:
                 self.chargingEnabled = False #no undercharging
                 Icharge = 0
@@ -327,20 +335,23 @@ class Sim_battery(object):
         self.CombinedModel.Model_Timestep(w_ano,w_cat,Icharge)
         self.V_stack = self.CombinedModel.GetVoltage(); 
         self.set_stack_current(Icharge)
-        self.set_state_of_charge(self.CombinedModel.GetSOC())
+        if self.Inverter.SimStatus == True:
+            self.set_state_of_charge(self.CombinedModel.GetSOC())
+        else:
+            self.set_state_of_charge(self.DummySOC/100)
 
         
     def get_stack_voltage(self):
         if self.Inverter.SimStatus == True:
             return (self.V_stack)
         else:
-            voltage = self.Inverter.converter.get_battery_voltage()
+            voltage = self.Inverter.converterclient.get_battery_voltage()
             return voltage
     def get_stack_current(self):
         if self.Inverter.SimStatus == True:
             return (self.Icharge)
         else:
-            current = self.Inverter.converter.get_battery_current()
+            current = self.Inverter.converterclient.get_battery_current()
             return current
     def set_stack_current(self,current):
         self.Icharge = current
@@ -348,8 +359,8 @@ class Sim_battery(object):
         if self.Inverter.SimStatus == True:
             return (self.P_stack_input)
         else:
-            [perphase,power] = self.Inverter.converter.get_active_power()
-            return power
+            power = self.Inverter.converterclient.get_dc_power()
+            return abs(power)
     def get_state_of_charge(self): #return J
         return (self.SOC)
     def get_stack_temperature(self):
@@ -443,6 +454,8 @@ class Sim_BMS(object):
         self.Rp =0;
         self.Cp =0;
         self.OCV =0;     
+
+        self.SimulationStarted = time.time()
         
     def get_negative_pump_speed(self):
         return int(self.pump_negative.get_pump_speed())
@@ -475,7 +488,10 @@ class Sim_BMS(object):
     def get_battery_power(self):
         return int(self.battery.get_stack_power())
     def get_battery_soc(self):
-        return self.CombinedModel.GetSOC()
+        if self.battery.Inverter.SimStatus == True:
+            return self.CombinedModel.GetSOC()
+        else:
+            return self.battery.DummySOC
     def set_power_reference(self, new_reference):
         self.power_reference = new_reference
         return int(self.power_reference)
@@ -490,6 +506,7 @@ class Sim_BMS(object):
         self.battery.set_battery_state(BATTERY_CHARGING)
         myBMS.setChargeMode(CB.BMS_CHARGING_MODE)
         self.BMS_state = BMS_CHARGING
+        self.battery.Inverter.FirstRun = True
     def stop_charger(self):
         print("stop charger")
         self.pump_negative.stop_pump()
@@ -508,6 +525,7 @@ class Sim_BMS(object):
         self.battery.set_battery_state(BATTERY_DISCHARGING)
         myBMS.setChargeMode(CB.BMS_DISCHARGING_MODE)
         self.BMS_state = BMS_DISCHARGING
+        self.battery.Inverter.FirstRun = True
     def set_BMS_state(self, new_state):
         if new_state == BMS_STANDBY:
             self.stop_charger()
@@ -534,6 +552,13 @@ class Sim_BMS(object):
     
     def update_simulation(self):
         self.simulationTime += self.battery.dt;
+
+        if (80 < (time.time() - self.SimulationStarted)) and (time.time() - self.SimulationStarted < 140):
+            self.battery.DummySOC = 70
+        elif (140 < (time.time() - self.SimulationStarted)) and (time.time() - self.SimulationStarted < 200):
+            self.battery.DummySOC = 0
+        else:
+            self.battery.DummySOC = 20
         
         BMS_state = self.get_BMS_state()
         if self.battery.SOC <= self.battery.SOC_MIN:
@@ -574,6 +599,24 @@ class Sim_BMS(object):
                 print("UNKNOWN state??? -> standby")
                 self.current_ref = 0;
                 self.set_BMS_state(BMS_STANDBY)
+        if self.battery.Inverter.SimStatus == False:
+            if BMS_state == BMS_STANDBY:
+                self.battery.Inverter.SetPowerRef(0) 
+            elif BMS_state == BMS_DISCHARGING:
+                if bat_voltage > MIN_DISCHARGE_VOLTAGE:  
+                   self.battery.Inverter.SetPowerRef(self.get_power_reference())
+                else:
+                    self.battery.Inverter.SetPowerRef(0) 
+            elif BMS_state == BMS_CHARGING:
+                if bat_voltage <= MAX_CHARGE_VOLTAGE:
+                    self.battery.Inverter.SetPowerRef(self.get_power_reference())
+                else:
+                    self.battery.Inverter.SetPowerRef(0)  
+            else:
+                print("UNKNOWN state??? -> standby")
+                self.self.battery.Inverter.SetPowerRef(0) 
+                self.set_BMS_state(BMS_STANDBY)
+
         elif self.battery.SimStatus == True:
             self.current_ref = myBMS.DummyCurrentRef() # Don't need to do a bunch of fancy stuff as hopefully the inverter is handling that
         else:

@@ -17,8 +17,8 @@ class Client():
         """
         # client = ModbusClient(ip=ip, retries=retries, port=port_number)
         self.client = ModbusClient(host=self.ip_address, port=502)
-        connected = self.client.connect()
-        return self, connected
+        self.connected = self.client.connect()
+        return self, self.connected
         
 
         # if client.connect():
@@ -52,7 +52,7 @@ class Client():
         """
         # Power stage configuration: 1 = power stage on // 0 = power stage off
         if self.connected:
-            self.client.write_coil(address=4000, value=0, unit=0)
+            self.client.write_coil(address=4000, value=0, unit=1)
             print('Power is Off')
         #client.close()
     def disconnect_from_client(self):
@@ -270,9 +270,10 @@ class Client():
                 power_dc_value = power_dc.registers[0]
             elif power_dc.registers[0] > 10000:
                 power_dc_value = -(65536 - power_dc.registers[0])
+            print(power_dc_value)
             return power_dc_value
         else:
-            return 0.0
+            return 0
 
 
 

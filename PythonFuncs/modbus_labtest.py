@@ -32,7 +32,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import pylab as pl
-import modbus_class as mbl
+from modbus_class import Client
 
 
 import msvcrt
@@ -305,8 +305,8 @@ def GetConverterPower(self):
 
 
             
-client = ModbusClient('localhost', retries=3, port=5020) 
-converter = mbl.Client()       
+# client = ModbusClient('localhost', retries=3, port=5020) 
+client = Client(ip_address='192.168.1.17')       
 
 def run_sync_client():
 
@@ -316,10 +316,12 @@ def run_sync_client():
     # client = ModbusClient('localhost', retries=3, port=5020)
     
     print("Opening connection to Trumpf converter")
-    [converterclient,connected] = converter.connect_to_client() # Connect to the converter server
+    [converter, connected] = client.connect_to_client() # Connect to the converter server
     print(connected)
-    converter.charge_battery()
-    converter.start_transmission(100)
+    # converter = mbl.Client(ip_address='192.168.1.17')
+    # connected = converter.connect_to_client()
+    converter.discharge_battery()
+    converter.start_transmission(1000)
     time.sleep(10)
     print(str(converter.get_active_power()))
     converter.set_AC_power(110)
@@ -327,7 +329,7 @@ def run_sync_client():
     print(str(converter.get_active_power()))
     time.sleep(10)
     converter.stop_transmission()
-    converterclient.disconnect_from_client()
+    converter.disconnect_from_client()
 
 
 if __name__ == "__main__":

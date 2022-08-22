@@ -63,7 +63,7 @@ def randvalue(minrange, maxrange):
 def Read_Ctrl_BMS          (Value):
     return int15(active_BMS.get_BMS_state());
 def Read_SOC               (Value):
-	return int15(active_BMS.battery.CombinedModel.GetSOC()*100);
+	return int15(active_BMS.get_battery_soc());
 def Read_P_ref             (Value):
 	return int15(active_BMS.get_power_reference());
 def Read_GaussVolt         (Value):
@@ -123,7 +123,7 @@ def Read_AC_DC_GRID_CURRENT(Value):
 def Read_AC_DC_GRID_VOLTAGE(Value):
 	return int15(active_BMS.battery.Inverter.get_grid_voltage());
 def Read_AC_DC_GRID_POWER  (Value):
-	return int15(active_BMS.battery.Inverter.get_grid_power());
+	return int15(active_BMS.battery.get_stack_power());
 def Read_DC_LINK_VOLTAGE   (Value):
 	return int15(active_BMS.battery.Inverter.get_DC_voltage());
 def Read_AC_DC_TEMP        (Value):
