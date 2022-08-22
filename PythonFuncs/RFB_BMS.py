@@ -167,13 +167,15 @@ class Sensors(object):
         self.Board_1_Dict = Board_1_Dict
         self.Board_2 = True
         self.Board_2_Dict = Board_2_Dict
-        self.Board_3 = False
+        self.Board_3 = True
         self.Board_3_Dict = Board_3_Dict
         
         # SENSORS
         # Values are TRUE if the sensor physically exists, otherwise FALSE.
-        self.Stack_Temp_Anolyte = True
+        self.Stack_Temp_Anolyte = False
         self.Stack_Temp_Catholyte = False
+
+        self.Flow_Anolyte = True
         
         # ACTUATORS
         # Values are TRUE if the actuator physically exists, otherwise FALSE
@@ -183,22 +185,43 @@ class Sensors(object):
         
         self.Board_1_Values = np.zeros([9,1])
         self.Board_2_Values = np.zeros([9,1])
-        self.Board_2_Values = np.zeros([9,1])
+        self.Board_3_Values = np.zeros([9,1])
         
     def Read_Board(self,Board):
         if getattr(self,Board) == True :
-           rr = self.SensorClient.read_holding_registers(0,9,self.BoardDict[Board]) # Read all registers from the desired board
-           setattr(self, Board + "_Values", rr.registers) # Map read to storage register
+            try: 
+                rr = self.SensorClient.read_holding_registers(0,9,self.BoardDict[Board]) # Read all registers from the desired board
+                setattr(self, Board + "_Values", rr.registers) # Map read to storage register
+            except:
+                print("Something went wrong while reading " + Board)
         else: 
             print(Board + " does not exist")
         
     def Write_Board(self,Board,RegName,value):  
         if getattr(self,Board) == True:
             dictvar = getattr(self,Board + "_Dict") # Figure out what the correct dictionary is for the given board
-            wr = self.SensorClient.write_holding_registers(dictvar[RegName], value, self.BoardDict[Board]) # Write the desired value to the correct register on the board
-            rr = self.SensorClient.read_holding_registers(0,9,self.BoardDict[Board])
-            if rr.registers[8] != value:
-                return False
+            ReadSuccessful = 0
+            WriteSuccessful = 0
+            Tries = 0
+            while WriteSuccessful != 1 and Tries < 3:
+                try:
+                    wr = self.SensorClient.write_holding_registers(dictvar[RegName], value, self.BoardDict[Board]) # Write the desired value to the correct register on the board
+                    WriteSuccessful = 1
+                    Tries = 0
+                except:
+                    Tries += 1
+                    time.sleep(0.01)
+            if Tries >= 3:
+                print("Modbus write timed out")
+            while ReadSuccessful != 1 and Tries < 3: 
+                try:
+                    rr = self.SensorClient.read_holding_registers(0,9,self.BoardDict[Board])
+                    ReadSuccessful = 1
+                except:
+                    Tries += 1
+                    time.sleep(0.01)
+            if Tries >= 3:
+                print("Modbus write timed out")
         else:
             print(Board + " does not exist or register does not exist on given board")
 
@@ -374,7 +397,10 @@ class Sim_battery(object):
     def get_battery_dt(self):
         return(self.dt)
     def get_flowrate(self):
-        return(self.FlowRate)
+        if self.sensors.Flow_Anolyte == True:
+            return(self.sensors.Board_3_Values[self.sensors.Board_3_Dict["SENSOR_FLOW_ANOLYTE"]])
+        else:
+            return(self.FlowRate)
     def set_flowrate(self,FlowRate):
         self.FlowRate = FlowRate
     def get_pressure(self):
@@ -557,9 +583,10 @@ class Sim_BMS(object):
             if getattr(self.battery.sensors,key) == True: 
                 self.battery.sensors.Read_Board(key)    # Read first
                 if self.battery.sensors.Variable_Load_Pending: # Then write
-                    self.battery.sensors.Write_Board("Board_2", "ACTUATOR_VARIABLE_LOAD", int(self.battery.sensors.Variable_Load_Ref))
+                    self.battery.sensors.Write_Board("Board_2", "ACTUATOR_VARIABLE_LOAD", abs(int(self.battery.sensors.Variable_Load_Ref)))
                     self.battery.sensors.Variable_Load_Pending = False
-                    
+
+        # print(self.battery.sensors.Board_2_Values) 
         
 
         

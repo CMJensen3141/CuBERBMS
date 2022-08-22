@@ -85,7 +85,7 @@ def read_single_register(client,UNIT,regnum):
     try:
         rr = client.read_holding_registers(regnum, 1, unit=UNIT)
         if rr.function_code >= 0x80:
-            print("Read error at register " + str(registernumber))
+            print("Read error at register " + str(regnum))
             status = False
         else:
             value = rr.registers[0]
@@ -160,7 +160,7 @@ class state_machine:
             soc = read_single_register(self.client,self.unit,Reg_SOC)
             if soc[0] == True:
                 # print(str(soc[1]))
-                if soc[1] >= 95:
+                if soc[1] >= 33:
                     if not write_single_register(self.client,self.unit,Reg_Ctrl_BMS, BMS_STANDBY):
                         self.state = STATE_ERROR
                         print("Write error during charging")
@@ -263,15 +263,16 @@ def run_sync_client():
         # time.sleep(1)
         [status,arr] = read_multiple_registers(HOLDING_REGISTER_COUNT, client, UNIT)
         datalist = np.append(datalist, arr.reshape(HOLDING_REGISTER_COUNT,1), axis=1)
-        WaitVar += 1
-        if WaitVar == 100:
+        if (time.time() - WaitVar) >= 5:
             write_single_register(client, UNIT, Reg_Load_Ref, RefVal)
-            RefVal += 10
-            WaitVar = 0
+            if RefVal < 300:
+                RefVal += 10
+            WaitVar = time.time()
     # ----------------------------------------------------------------------- #
     # close the client
     # ----------------------------------------------------------------------- #
     print("Closing connection to BMS server")
+    write_single_register(client, UNIT, Reg_Load_Ref, 0)
     client.close()
     print("Connection successfully closed")
     return datalist
@@ -283,7 +284,7 @@ if __name__ == "__main__":
     data = data.T
     dframe = pd.DataFrame(data, columns = RegNames)
     
-    dframe.plot(subplots = True, y = ["Reg_Stack_voltage","Reg_Stack_Current","Reg_P_ref","Reg_Load_Ref"])
+    dframe.plot(subplots = True, y = ["Reg_Stack_voltage","Reg_Stack_Current","Reg_P_ref","Reg_Load_Ref","Reg_Flow_Anolyte"])
     plt.show()
     
 

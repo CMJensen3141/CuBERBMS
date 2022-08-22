@@ -85,7 +85,7 @@ def Read_Temp_anolyte_In   (Value):
     out = active_BMS.battery.CombinedModel.GetTemps()
     return int15(out[1]);            ###@TODO
 def Read_Flow_Anolyte      (Value):
-    return int15(active_BMS.battery.CombinedModel.GetAnoFlows()) # Check that units are correct (currently l/s)
+    return int15(active_BMS.battery.get_flowrate()) # Check that units are correct (currently l/s)
 def Read_Pressure_Anolyte  (Value):
     return int15(AtmPres-active_BMS.battery.CombinedModel.GetAnoPressure_Pump()); # Check that units are correct (currently mbar)
 def Read_Speed_Anolyte     (Value):
@@ -397,7 +397,7 @@ def run_server():
     # to write to the block
     # store_1.setValues(0x0F, 0, [111, 121, 122, 123, 124])
 
-    interval = 0.05
+    interval = 1
 
     server = ModbusTcpServer(context, identity=identity, address=('0.0.0.0', 5020))
     t = threading.Thread(target=server.serve_forever, daemon=True)

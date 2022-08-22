@@ -23,6 +23,11 @@ print("Load:", rr.registers)
 rr = client.read_holding_registers(address=0, count=9, unit=3)
 print("Slave:", rr.registers)
 
+rr = client.read_holding_registers(address=1, count=1, unit=3)
+print("Slave:", rr.registers)
+
+client.close()
+
 
 
 
