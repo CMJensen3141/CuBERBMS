@@ -35,7 +35,7 @@ class RTU_Client():
 
 if __name__ == "__main__":
 
-    rtu = RTU_Client("COM7")
+    rtu = RTU_Client("COM3")
     print(rtu.connect_to_rtu_client())
    
     UNIT = 2
@@ -44,4 +44,8 @@ if __name__ == "__main__":
     print(wr)
     rr = rtu.read_holding_registers(0, 9, UNIT)
     print(rr.registers)
+    print(rr.registers[0])
+    print(rr.registers[1])
+
+    rtu.disconnect_from_RTU_client()
 

@@ -13,6 +13,7 @@ import RFB_CombinedModel as ComMod
 from bms_registers import * 
 from UnitConversions import *
 import modbus_class as mc
+import modbus_class_rtu as mc_rtu
 import time
 
 # --------------------------------------------------------------------------- #
@@ -152,6 +153,41 @@ class Sim_Inverter(object):
             self.inverter_state = INVERTER_DISCHARGING
         self.DC_power = abs(float(power_reference))
         return(self.DC_power)
+    
+class Sensors(object):
+    def __init__(self):
+        self.SensorClient = mc_rtu.RTU_Client("COM3")
+        self.SensorClient.connect_to_rtu_client()
+        
+        self.BoardDict = BoardDict
+        # Values are TRUE if the board physically exists, otherwise false
+        self.Board_1 = False
+        self.Board_1_Dict = Board_1_Dict
+        self.Board_2 = True
+        self.Board_2_Dict = Board_2_Dict
+        self.Board_3 = False
+        self.Board_3_Dict = Board_3_Dict
+        # Values are TRUE if the sensor physically exists, otherwise FALSE
+        self.Stack_Temp_Anolyte = True
+        self.Stack_Temp_Catholyte = False
+        
+        self.Board_1_Values = np.zeros([9,1])
+        self.Board_2_Values = np.zeros([9,1])
+        self.Board_2_Values = np.zeros([9,1])
+        
+    def Read_Board(self,Board):
+        if getattr(self,Board) == True :
+           rr = self.SensorClient.read_holding_registers(0,9,self.BoardDict[Board]) 
+           setattr(self, Board + "_Values", rr.registers)
+        else: 
+            print(Board + " does not exist")
+        
+    def Write_Board(self,Board,RegName,value):  
+        if getattr(self,Board) == True :
+            dictvar = getattr(self,Board + "_Dict") # Figure out what the correct dictionary is for the given board
+            wr = self.SensorClient.write_holding_registers(dictvar[RegName], value, self.BoardDict[Board]) # Write the desired value to the correct register on the board
+        else:
+            print(Board + " does not exist or register does not exist on given board")
 
 class Sim_pump(object):
     """simple pump simulation """
@@ -235,6 +271,7 @@ class Sim_battery(object):
         self.T_ambient = 30 # Ambient temperature in degrees celsius
         
         self.Inverter = Sim_Inverter()
+        self.sensors = Sensors()
         self.CombinedModel = ComMod.RFB_CombinedModel(self.dt, self.R_1, self.T_ambient, self.c_total)
         
         self.SimStatus = True # Indicate whether we are simulating the battery dynamics
@@ -280,7 +317,9 @@ class Sim_battery(object):
     def get_state_of_charge(self): #return J
         return (self.SOC)
     def get_stack_temperature(self):
-        if self.SimStatus == True:
+        if self.sensors.Stack_Temp_Anolyte == True:
+            return(self.sensors.Board_2_Values[self.sensors.Board_2_Dict["SENSOR_TEMP_ANOLYTE"]]) # Return the correct sensor reading
+        else:
             return(self.stack_temperature)
     def get_charge_limit(self):
         return (self.Charge_limit)
@@ -342,6 +381,7 @@ class Sim_BMS(object):
         
         self.pump_negative =  Sim_pump()
         self.pump_positive =  Sim_pump()
+    
 
         self.pump_negative.stop_pump()
         self.pump_positive.stop_pump()
@@ -488,6 +528,12 @@ class Sim_BMS(object):
             self.current_ref = myBMS.DummyCurrentRef() # Don't need to do a bunch of fancy stuff as hopefully the inverter is handling that
         else:
             self.current_ref = self.battery.get_stack_current()
+            
+        for key in self.battery.sensors.BoardDict:
+            if getattr(self.battery.sensors,key) == True: 
+                self.battery.sensors.Read_Board(key)
+        self.battery.sensors.Write_Board('Board_2','ACTUATOR_VARIABLE_LOAD',69)
+        # print("Stack temperature is " + str(self.battery.get_stack_temperature()))
         
         self.battery.update_stack_simulation(self.pump_positive.get_pump_duty(),
                                              self.pump_negative.get_pump_duty(),

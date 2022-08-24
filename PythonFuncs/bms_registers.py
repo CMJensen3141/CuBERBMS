@@ -5,6 +5,8 @@ Created on Thu Aug 18 13:27:16 2022
 @author: chris
 """
 
+#%% BMS Server holding registers
+
 Reg_Ctrl_BMS 				= 100; #Control of the battery (charge or discharge)
 Reg_SOC						= 101; #State of charge of the battery
 Reg_P_ref					= 102; #Reference for charge level (positive = discharging from battery to grid)
@@ -127,3 +129,38 @@ RegNames = ['Reg_Ctrl_BMS',
             'Reg_cp_hi_est',
             'Reg_cp_lo_est',
             'Reg_ocv_est']
+
+#%% Sensor and board registers
+
+BoardDict = {};
+
+
+BOARD_1 = 1
+
+BOARD_2 = 2
+
+SENSOR_TEMP_ANOLYTE = 20 # First digit indicates board number, second digit indicates register number
+SENSOR_TEMP_CATHOLYTE = 21
+ACTUATOR_VARIABLE_LOAD = 28
+
+BOARD_3 = 3
+
+BoardDict["Board_1"] = BOARD_1
+BoardDict["Board_2"] = BOARD_2
+BoardDict["Board_3"] = BOARD_3
+
+Board_1_Dict = {}
+
+Board_2_Dict = {}
+
+# Convert register variables to correct board address
+Board_2_Dict["SENSOR_TEMP_ANOLYTE"] = SENSOR_TEMP_ANOLYTE - 10*BOARD_2
+Board_2_Dict["SENSOR_TEMP_CATHOLYTE"] = SENSOR_TEMP_CATHOLYTE - 10*BOARD_2
+Board_2_Dict["ACTUATOR_VARIABLE_LOAD"] = ACTUATOR_VARIABLE_LOAD - 10*BOARD_2
+
+Board_3_Dict = {}
+
+
+
+
+
