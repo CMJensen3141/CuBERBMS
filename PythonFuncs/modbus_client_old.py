@@ -30,6 +30,7 @@ import time
 import math
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import pylab as pl
 from bms_registers import *
@@ -48,32 +49,33 @@ STATE_DISCHARGE = -2
 STATE_PAUSE = 3
 STATE_ERROR = 666
 
-def readvalue(client, registernumber, inputarray):
-    UNIT = 0x1
-    rr = client.read_holding_registers(registernumber, 1, unit=UNIT)
-    if rr.function_code >= 0x80:
-        print("Read error")
-        inputarray=np.append(inputarray, -1.0)
-    else:
-        inputarray=np.append(inputarray, rr.registers[0]*1.0)
+# def readvalue(client, registernumber, inputarray):
+#     UNIT = 0x1
+#     rr = client.read_holding_registers(registernumber, 1, unit=UNIT)
+#     if rr.function_code >= 0x80:
+#         print("Read error at register " + str(registernumber))
+#         inputarray=np.append(inputarray, -1.0)
+#     else:
+#         inputarray=np.append(inputarray, rr.registers[0]*1.0)
             
-    return (inputarray)
+#     return (inputarray)
     
 def read_multiple_registers(num_to_read, client, UNIT):
     status = False
-    try:
-        rr = client.read_holding_registers(Reg_Ctrl_BMS, num_to_read, unit=UNIT)
-        if rr.function_code >= 0x80:
-            print("Read error")
-        else:
-            if rr: 
-                regs = np.array(rr.registers)
-                regs = regs.reshape(1,len(regs))
-                status = True
-    except:
-        print ('(exception detected)')
+    jj = 0
+    for ii in range(Reg_Ctrl_BMS,Reg_Ctrl_BMS + num_to_read):
+        try:
+            # rr = client.read_holding_registers(Reg_Ctrl_BMS, num_to_read, unit=UNIT)
+            [status,value] = read_single_register(client,UNIT,ii)      
+            if ii == Reg_Ctrl_BMS:
+                arr = value
+            else:
+                arr = np.append(arr,value)
+        except:
+            print ('(exception detected at ' + str(ii) + ")")
+    status = True
     if status == True:
-        return [status,regs]
+        return [status,arr]
     else:
         return [status,np.zeros([1,num_to_read])]
         
@@ -83,12 +85,12 @@ def read_single_register(client,UNIT,regnum):
     try:
         rr = client.read_holding_registers(regnum, 1, unit=UNIT)
         if rr.function_code >= 0x80:
-            print("Read error")
+            print("Read error at register " + str(registernumber))
             status = False
         else:
             value = rr.registers[0]
     except:
-        print ('(exception detected)')
+        print ('(read exception detected at ' + str(regnum) + ')')
         status = False
     
     return [status, value] 
@@ -101,7 +103,7 @@ def write_single_register(client,UNIT,regnum,value):
             print("Write error")
             status = False
     except:
-        print ('(exception detected)')
+        print ('(write exception detected)')
         status = False
     
     return status 
@@ -157,14 +159,14 @@ class state_machine:
                 return False
             soc = read_single_register(self.client,self.unit,Reg_SOC)
             if soc[0] == True:
-                print(str(soc[1]))
-                if soc[1] >= 50:
+                # print(str(soc[1]))
+                if soc[1] >= 95:
                     if not write_single_register(self.client,self.unit,Reg_Ctrl_BMS, BMS_STANDBY):
                         self.state = STATE_ERROR
                         print("Write error during charging")
                     else:
                         self.state = STATE_PAUSE
-                        self.waitcounter = 1
+                        self.waitcounter = 50
             else:
                 self.state = STATE_ERROR
                 print("Read error B in during charging")
@@ -173,7 +175,7 @@ class state_machine:
 
         elif self.state == STATE_PAUSE:
             if self.waitcounter > 0:
-                print("Pausing for " + str(self.waitcounter) + " more seconds")
+                # print("Pausing for " + str(self.waitcounter) + " more seconds")
                 self.waitcounter = self.waitcounter - 1
             else:
                 rq = write_single_register(client,self.unit,Reg_Ctrl_BMS, BMS_DISCHARGING)
@@ -195,7 +197,7 @@ class state_machine:
                 self.state = STATE_ERROR
                 return False
             soc = read_single_register(self.client,self.unit,Reg_SOC)
-            print("SOC is " + str(soc[1]))
+            # print("SOC is " + str(soc[1]))
             if soc[0] == True:
                 if soc[1] <= 5:
                     if not write_single_register(self.client,self.unit,Reg_Ctrl_BMS, BMS_STANDBY):
@@ -231,13 +233,19 @@ def run_sync_client():
     # client = ModbusClient('localhost', retries=3, port=5020)
     
     print("Opening connection to Modbus client")
-    client.connect() # Connect to the modbus server
     UNIT = 0x1 # Logic unit number
+    client.connect() # Connect to the modbus server
     # client.write_register(Reg_Ctrl_BMS, 1, unit=UNIT)
     # rr = client.read_holding_registers(Reg_Ctrl_BMS, 1, unit=UNIT)
     # print(rr.registers)
     SM = state_machine(client,UNIT) # Instantiate the state machine
-    datalist = read_multiple_registers(HOLDING_REGISTER_COUNT, client, UNIT)
+    datalist = np.empty([HOLDING_REGISTER_COUNT,1],dtype = object)
+    [status,arr] = read_multiple_registers(HOLDING_REGISTER_COUNT, client, UNIT)
+    if status == True:
+        datalist[:,0] = arr
+    else:
+        datalist = np.zeros(1,1)
+    read_single_register(client, UNIT, Reg_Ctrl_BMS)
     print("Connection successfully opened")
  
     
@@ -249,19 +257,26 @@ def run_sync_client():
         # print("Entering the Matrix")
         SM.state_handler(client)
         # time.sleep(1)
-        # datalist = np.append(datalist, read_multiple_registers(HOLDING_REGISTER_COUNT, client, UNIT), axis=0)
-    
+        [status,arr] = read_multiple_registers(HOLDING_REGISTER_COUNT, client, UNIT)
+        datalist = np.append(datalist, arr.reshape(HOLDING_REGISTER_COUNT,1), axis=1)
     # ----------------------------------------------------------------------- #
     # close the client
     # ----------------------------------------------------------------------- #
     print("Closing connection to BMS server")
     client.close()
     print("Connection successfully closed")
+    return datalist
 
 
 if __name__ == "__main__":
 
-    run_sync_client()
+    data = run_sync_client()
+    data = data.T
+    dframe = pd.DataFrame(data, columns = RegNames)
+    
+    dframe.plot(subplots = True, y = ["Reg_Stack_voltage","Reg_Stack_Current","Reg_P_ref"])
+    plt.show()
+    
 
 #    test=easygui.ynbox('Run test?', 'Title', ('Yes', 'No'))
 #    if test:

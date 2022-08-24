@@ -32,6 +32,7 @@ import logging
 
 from bms_registers import *
 import RFB_BMS as BMS
+AtmPres = 1000
 
 
 logging.basicConfig()
@@ -60,7 +61,7 @@ def randvalue(minrange, maxrange):
         
 #Call back functions reacieve current value in register and return value is written back to the register
 def Read_Ctrl_BMS          (Value):
-	return (active_BMS.BMS_state);
+    return int15(active_BMS.get_BMS_state());
 def Read_SOC               (Value):
 	return int15(active_BMS.battery.CombinedModel.GetSOC()*100);
 def Read_P_ref             (Value):
@@ -102,33 +103,33 @@ def Read_Pressure_catholyte(Value):
 def Read_Speed_catholyte   (Value):
 	return int15(active_BMS.get_positive_pump_speed());
 def Read_DC_DC_ON          (Value):
-	return int15(active_BMS.inverter_obj.get_inverter_state());
+	return int15(active_BMS.battery.Inverter.get_inverter_state());
 def Read_DC_DC_CURRENT     (Value):
-	return int15(active_BMS.inverter_obj.get_DC_current());
+	return int15(active_BMS.battery.Inverter.get_DC_current());
 def Read_DC_DC_VOLTAGE     (Value):
-	return int15(active_BMS.inverter_obj.get_DC_voltage());
+	return int15(active_BMS.battery.Inverter.get_DC_voltage());
 def Read_DC_DC_POWER       (Value):
-	return int15(active_BMS.inverter_obj.get_DC_power());
+	return int15(active_BMS.battery.Inverter.get_DC_power());
 def Read_DC_DC_TEMP        (Value):
-	return int15(active_BMS.inverter_obj.get_inverter_internal_temp());
+	return int15(active_BMS.battery.Inverter.get_inverter_internal_temp());
 def Read_DC_DC_AMBIENT_TEMP(Value):
-	return int15(active_BMS.inverter_obj.get_inverter_ambient_temp());
+	return int15(active_BMS.battery.Inverter.get_inverter_ambient_temp());
 def Read_DC_DC_ERRORS      (Value):
 	return (randvalue(0,1));            ###@TODO
 def Read_AC_DC_ON          (Value):
-	return int15(active_BMS.inverter_obj.get_inverter_state());
+	return int15(active_BMS.battery.Inverter.get_inverter_state());
 def Read_AC_DC_GRID_CURRENT(Value):
-	return int15(active_BMS.inverter_obj.get_grid_current());
+	return int15(active_BMS.battery.Inverter.get_grid_current());
 def Read_AC_DC_GRID_VOLTAGE(Value):
-	return int15(active_BMS.inverter_obj.get_grid_voltage());
+	return int15(active_BMS.battery.Inverter.get_grid_voltage());
 def Read_AC_DC_GRID_POWER  (Value):
-	return int15(active_BMS.inverter_obj.get_grid_power());
+	return int15(active_BMS.battery.Inverter.get_grid_power());
 def Read_DC_LINK_VOLTAGE   (Value):
-	return int15(active_BMS.inverter_obj.get_DC_voltage());
+	return int15(active_BMS.battery.Inverter.get_DC_voltage());
 def Read_AC_DC_TEMP        (Value):
-	return int15(active_BMS.inverter_obj.get_inverter_internal_temp());
+	return int15(active_BMS.battery.Inverter.get_inverter_internal_temp());
 def Read_AC_DC_AMBIENT_TEMP(Value):
-	return int15(active_BMS.inverter_obj.get_inverter_ambient_temp());
+	return int15(active_BMS.battery.Inverter.get_inverter_ambient_temp());
 def Read_AC_DC_ERRORS      (Value):
 	return (0);            ###@TODO
 def Read_Speed_Thermal     (Value):
@@ -147,13 +148,13 @@ def Read_thermal_temp_catholyte (value):
 def Read_thermal_temp_anolyte   (value):
     out = active_BMS.battery.CombinedModel.GetTemps()
     return int15(out[0])      
-def read_anolyte_pressure_out   (value):
+def Read_anolyte_pressure_out   (value):
 	return int15(AtmPres-active_BMS.battery.CombinedModel.GetAnoPressure_Stack());      
-def read_catholyte_pressure_out (value):
+def Read_catholyte_pressure_out (value):
 	return int15(AtmPres-active_BMS.battery.CombinedModel.GetCatPressure_Stack());      
-def read_anolyte_temp_out      (value):
+def Read_anolyte_temp_out      (value):
 	return (randvalue(23,25));      
-def read_catholyte_temp_out     (value):
+def Read_catholyte_temp_out     (value):
 	return (randvalue(23,25));      
 def Read_Rs_est    (self):
     return int15(active_BMS.Rs * 1000)
@@ -209,15 +210,15 @@ read_function_switch_statement = {
     Reg_Simulation_clock        :Read_Simulation_clock      ,
     Reg_thermal_temp_catholyte  :Read_thermal_temp_catholyte,
     Reg_thermal_temp_anolyte    :Read_thermal_temp_anolyte  ,
-    reg_anolyte_pressure_out    :read_anolyte_pressure_out  ,
-    reg_catholyte_pressure_out  :read_catholyte_pressure_out,
-    reg_anolyte_temp_out        :read_anolyte_temp_out     ,
-    reg_catholyte_temp_out      :read_catholyte_temp_out    ,
-    reg_rs_est                  :Read_Rs_est, 
-    reg_rp_est                  :Read_Rp_est, 
-    reg_cp_hi_est               :Read_Cp_hi_est,
-    reg_cp_lo_est               :Read_CP_lo_est,
-    reg_ocv_est                 :Read_OCV_est
+    Reg_anolyte_pressure_out    :Read_anolyte_pressure_out  ,
+    Reg_catholyte_pressure_out  :Read_catholyte_pressure_out,
+    Reg_anolyte_temp_out        :Read_anolyte_temp_out     ,
+    Reg_catholyte_temp_out      :Read_catholyte_temp_out    ,
+    Reg_rs_est                  :Read_Rs_est, 
+    Reg_rp_est                  :Read_Rp_est, 
+    Reg_cp_hi_est               :Read_Cp_hi_est,
+    Reg_cp_lo_est               :Read_CP_lo_est,
+    Reg_ocv_est                 :Read_OCV_est
     };
 
         
@@ -307,11 +308,11 @@ class CustomDataBlock(ModbusSparseDataBlock):
         # however make sure not to do too much work here or it will
         # block the server, espectially if the server is being written
         # to very quickly
-        print("Made it this far in the write sequence!")
+        # print("Made it this far in the write sequence!")
         for idx in range(len(value)):
             current_address = (address+idx) - 1
             if current_address == Reg_Ctrl_BMS:
-                print("Made it to the part where I write to the BMS state")
+                # print("Made it to the part where I write to the BMS state")
                 active_BMS.set_BMS_state(value[idx])
                 print("wrote {} at {} (BMS control)".format(value[idx], address+idx))                
             elif current_address ==  Reg_P_ref:
@@ -390,7 +391,7 @@ def run_server():
     # to write to the block
     # store_1.setValues(0x0F, 0, [111, 121, 122, 123, 124])
 
-    interval = 0.33333
+    interval = 0.05
 
     server = ModbusTcpServer(context, identity=identity, address=('0.0.0.0', 5020))
     t = threading.Thread(target=server.serve_forever, daemon=True)

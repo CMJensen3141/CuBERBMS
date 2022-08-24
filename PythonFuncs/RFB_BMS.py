@@ -47,7 +47,7 @@ CAP_LOSS = 1.0
 
 myBMS = CB.CuBMS(BMS_Lim_max, BMS_Lim_min, BMS_I_max, BMS_I_min, BMS_I_tog, BMS_PumpMax, BMS_PumpMin,BMS_EstMode,TimeStep)
 #TempRegulator = CF.PID(0.01,0.05,0,0,0.1,0)
-#BatteryModel = mbs.Sim_BMS()
+# BatteryModel = Sim_BMS()
 
 #FlowRate = 0
 #Cooling = 0
@@ -68,7 +68,7 @@ class Sim_Inverter(object):
         self.efficiency = 0.93
         self.inverter_ambient_temp = 40.0;
         self.inverter_internal_temp = self.inverter_ambient_temp 
-        self.SimStatus = False
+        self.SimStatus = True
         self.converter = mc.Client()  
         self.converterclient = 0
         self.FirstRun = True
@@ -185,7 +185,6 @@ class Sim_pump(object):
         return(self.pump_running)
         
 class Sim_battery(object):
-    """simple stack thermal simulation """
     def __init__(self):
         self.P_max = 5000;
         self.P_loss_max = self.P_max * 0.1
@@ -199,7 +198,6 @@ class Sim_battery(object):
         self.V_dc = self.cell_voltage*self.cell_number #rated voltage 
         self.E_tank = 50 * kWh_to_J #value in Joule from 25 kWh
         self.E_tank_kWh = self.E_tank/kWh_to_J
-        # self.V_charging = self.V_dc
         self.I_max = self.P_max / self.V_dc
         
         self.R_1 = self.P_loss_max / (self.I_max*self.I_max)  #calculate resistance from losses and estimated current
@@ -208,7 +206,6 @@ class Sim_battery(object):
         self.Q_tank = self.C* self.V_dc
         self.dt = TimeStep #delta t in seconds
         self.SpeedUp = Speed_Factor
-        # self.iternum = 100/self.dt
         myBMS.setTimeStep(self.dt)
         
         self.chargingEnabled = False
@@ -239,6 +236,8 @@ class Sim_battery(object):
         
         self.Inverter = Sim_Inverter()
         self.CombinedModel = ComMod.RFB_CombinedModel(self.dt, self.R_1, self.T_ambient, self.c_total)
+        
+        self.SimStatus = True # Indicate whether we are simulating the battery dynamics
 
     def update_stack_simulation(self,w_ano,w_cat,Icharge):
 
@@ -281,7 +280,8 @@ class Sim_battery(object):
     def get_state_of_charge(self): #return J
         return (self.SOC)
     def get_stack_temperature(self):
-        return(self.stack_temperature)
+        if self.SimStatus == True:
+            return(self.stack_temperature)
     def get_charge_limit(self):
         return (self.Charge_limit)
     
@@ -304,9 +304,6 @@ class Sim_battery(object):
         elif new_state == BATTERY_DISCHARGING:
             self.chargingEnabled = True
             self.charging = False
-#        else:
-#            self.chargingEnabled = False
-#            self.charging = True
             
         self.battery_state = new_state
         return (self.battery_state)
@@ -459,11 +456,8 @@ class Sim_BMS(object):
                 print("MAX SOC reached")
 
         bat_voltage=self.battery.get_stack_voltage()*1.0
-        #current_ref = 0
         power_ref = self.get_power_reference()*1.0
-        #if bat_voltage > MIN_DISCHARGE_VOLTAGE:
-        #DIVISION_FIX = 0.001;
-        #print("Power ref = {}".format(power_ref) )
+        
         if BMS_state == BMS_DISCHARGING:
             myBMS.setRefPower(-power_ref)
         elif BMS_state == BMS_CHARGING:
@@ -471,40 +465,27 @@ class Sim_BMS(object):
         else:
             myBMS.setRefPower(0)
         
-        PLEASE FIX THE CURRENT REFERENCE
         
-        #current_ref =  power_ref / (bat_voltage + DIVISION_FIX)
         if self.battery.Inverter.SimStatus == True: 
-            current_ref_ctrl = myBMS.DummyCurrentRef()
-            #print("Current ref {}".format(current_ref_ctrl))
-    #        self.current_ref = 0.25 * self.current_ref + 0.75 * current_ref_ctrl
-            self.current_ref = current_ref_ctrl
+            self.current_ref = myBMS.DummyCurrentRef()
             if self.current_ref > self.battery.get_charge_limit():
                 self.current_ref = self.battery.get_charge_limit()
             if BMS_state == BMS_STANDBY:
-                self.current_ref = 0;
-                #print("STANDBY: bat_voltage {} ".format(bat_voltage))     
+                self.current_ref = 0;  
             elif BMS_state == BMS_DISCHARGING:
-                if bat_voltage > MIN_DISCHARGE_VOLTAGE:
-                    #current_ref = -current_ref;
-                    #                    print("DISCHARGING: bat_voltage {} at {} current ".format(bat_voltage , self.current_ref))     
+                if bat_voltage > MIN_DISCHARGE_VOLTAGE:  
                     self.current_ref = self.current_ref 
                 else:
                     self.current_ref = self.current_ref 
             elif BMS_state == BMS_CHARGING:
-                if bat_voltage <= MIN_DISCHARGE_VOLTAGE:
-                    #current_ref = self.battery.get_charge_limit();
-    #                    print("CHARGING low voltage: bat_voltage {} at {} current ".format(bat_voltage , self.current_ref))  
+                if bat_voltage <= MIN_DISCHARGE_VOLTAGE: 
                     self.current_ref = self.current_ref 
-                    #print("CHARGING at low voltage")
-    #                else:
-    #                    print("CHARGING: bat_voltage {} at {} current_ref ".format(bat_voltage , self.current_ref))  
-                    #print("Charging")
             else:
-                #print(":UNKNOWN state - bat_voltage {} at {} current ".format(bat_voltage , self.current_ref))  
                 print("UNKNOWN state??? -> standby")
                 self.current_ref = 0;
                 self.set_BMS_state(BMS_STANDBY)
+        elif self.battery.SimStatus == True:
+            self.current_ref = myBMS.DummyCurrentRef() # Don't need to do a bunch of fancy stuff as hopefully the inverter is handling that
         else:
             self.current_ref = self.battery.get_stack_current()
         
@@ -520,9 +501,9 @@ class Sim_BMS(object):
                                   self.battery.get_stack_temperature(),
                                   self.battery.get_flowrate());
         
-        print("Positive pump: " + str(self.pump_positive.get_pump_duty()))
-        print("Negative pump: " +str(self.pump_negative.get_pump_duty()))
-        print("Current reference:" + str(self.current_ref))
+        # print("Positive pump: " + str(self.pump_positive.get_pump_duty()))
+        # print("Negative pump: " +str(self.pump_negative.get_pump_duty()))
+        # print("Current reference:" + str(self.current_ref))
         
 if __name__ == "__main__":
     Test_Trumpf()
