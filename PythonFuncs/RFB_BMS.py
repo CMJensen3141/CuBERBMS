@@ -94,24 +94,24 @@ class Sim_Inverter(object):
             if self.FirstRun == True:
                 self.TimeStamp = time.time()
                 self.converterclient.charge_battery()
-                print("First run power reference is" + str(ref))
+                # print("First run power reference is" + str(ref))
                 self.converterclient.start_transmission(5000)
                 self.FirstRun = False
             else:
                 if (self.TimeStamp + 60) > time.time():
                     self.converterclient.set_constant_power(ref)
-                    print("NOT FIRST RUN power reference is" + str(ref))
+                    # print("NOT FIRST RUN power reference is" + str(ref))
         elif self.inverter_state == INVERTER_DISCHARGING:
             if self.FirstRun == True:
                 self.TimeStamp = time.time()
                 self.converterclient.discharge_battery()
                 self.converterclient.start_transmission(5000)
-                print("Power reference is" + str(ref))
+                # print("Power reference is" + str(ref))
                 self.FirstRun = False
             else:
                 if (self.TimeStamp + 60) > time.time():
                     self.converterclient.set_constant_power(ref)
-                    print("Power reference is" + str(ref))
+                    # print("Power reference is" + str(ref))
         else:
             print("Attempting to change power reference while in standby mode.")            
         
@@ -161,8 +161,6 @@ class Sim_Inverter(object):
     
 class Sensors(object):
     def __init__(self):
-        self.SensorClient = mc_rtu.RTU_Client("COM3")
-        self.SensorClient.connect_to_rtu_client()
         self.BoardDict = BoardDict
 
         
@@ -174,6 +172,10 @@ class Sensors(object):
         self.Board_2_Dict = Board_2_Dict
         self.Board_3 = True
         self.Board_3_Dict = Board_3_Dict
+
+        if self.Board_1 == True or self.Board_2 == True or self.Board_3 == True:
+            self.SensorClient = mc_rtu.RTU_Client("COM3")
+            self.SensorClient.connect_to_rtu_client()
         
         # SENSORS
         # Values are TRUE if the sensor physically exists, otherwise FALSE.
@@ -330,7 +332,7 @@ class Sim_battery(object):
             if self.CombinedModel.GetSOC() <= self.SOC_MIN:
                 self.chargingEnabled = False #no undercharging
                 Icharge = 0
-                print("I think the current SOC is " + str(self.CombinedModel.GetSOC()))
+                # print("I think the current SOC is " + str(self.CombinedModel.GetSOC()))
             
         self.CombinedModel.Model_Timestep(w_ano,w_cat,Icharge)
         self.V_stack = self.CombinedModel.GetVoltage(); 
@@ -352,7 +354,7 @@ class Sim_battery(object):
             return (self.Icharge)
         else:
             current = self.Inverter.converterclient.get_battery_current()
-            return current
+            return abs(current)
     def set_stack_current(self,current):
         self.Icharge = current
     def get_stack_power (self):
@@ -482,16 +484,17 @@ class Sim_BMS(object):
         return (self.battery.Inverter.get_inverter_state())
     
     def get_battery_current(self):
-        return int(self.battery.get_stack_current())
+        return abs(int(self.battery.get_stack_current()))
     def get_battery_voltage(self):
         return int(self.battery.get_stack_voltage())
     def get_battery_power(self):
         return int(self.battery.get_stack_power())
     def get_battery_soc(self):
         if self.battery.Inverter.SimStatus == True:
-            return self.CombinedModel.GetSOC()
+            soc = self.battery.CombinedModel.GetSOC()*100
         else:
-            return self.battery.DummySOC
+            soc = self.battery.DummySOC
+        return soc
     def set_power_reference(self, new_reference):
         self.power_reference = new_reference
         return int(self.power_reference)
@@ -553,9 +556,9 @@ class Sim_BMS(object):
     def update_simulation(self):
         self.simulationTime += self.battery.dt;
 
-        if (80 < (time.time() - self.SimulationStarted)) and (time.time() - self.SimulationStarted < 140):
+        if (120 < (time.time() - self.SimulationStarted)) and (time.time() - self.SimulationStarted < 420):
             self.battery.DummySOC = 70
-        elif (140 < (time.time() - self.SimulationStarted)) and (time.time() - self.SimulationStarted < 200):
+        elif (420 < (time.time() - self.SimulationStarted)) and (time.time() - self.SimulationStarted < 720):
             self.battery.DummySOC = 0
         else:
             self.battery.DummySOC = 20
@@ -625,7 +628,7 @@ class Sim_BMS(object):
         for key in self.battery.sensors.BoardDict:
             if getattr(self.battery.sensors,key) == True: 
                 self.battery.sensors.Read_Board(key)    # Read first
-                if self.battery.sensors.Variable_Load_Pending: # Then write
+                if self.battery.sensors.Variable_Load_Pending == True: # Then write
                     self.battery.sensors.Write_Board("Board_2", "ACTUATOR_VARIABLE_LOAD", abs(int(self.battery.sensors.Variable_Load_Ref)))
                     self.battery.sensors.Variable_Load_Pending = False
 

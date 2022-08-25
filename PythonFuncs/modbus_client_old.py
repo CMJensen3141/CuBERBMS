@@ -133,7 +133,7 @@ class state_machine:
                 self.state = STATE_ERROR
                 print("Error in start sequence")
                 return False
-            rq = write_single_register(client,self.unit,Reg_P_ref, 2500)
+            rq = write_single_register(client,self.unit,Reg_P_ref, 0)
             if rq == True:
                 self.state = STATE_CHARGE
             else:
@@ -142,7 +142,8 @@ class state_machine:
                 return False
             res = read_single_register(self.client,self.unit,Reg_Ctrl_BMS)
             if res[0] == True:
-                print(str(res[1]))
+                # print(str(res[1]))
+                foo = 0
             else:
                 print("Failed to read and echo")
             
@@ -159,7 +160,8 @@ class state_machine:
                 return False
             soc = read_single_register(self.client,self.unit,Reg_SOC)
             if soc[0] == True:
-                print(str(soc[1]))
+                # print(str(soc[1]))
+                foo = 0
                 if soc[1] >= 33:
                     if not write_single_register(self.client,self.unit,Reg_Ctrl_BMS, BMS_STANDBY):
                         self.state = STATE_ERROR
@@ -175,7 +177,7 @@ class state_machine:
 
         elif self.state == STATE_PAUSE:
             if self.waitcounter > 0:
-                # print("Pausing for " + str(self.waitcounter) + " more seconds")
+                print("Pausing for " + str(self.waitcounter) + " more seconds")
                 self.waitcounter = self.waitcounter - 1
             else:
                 rq = write_single_register(client,self.unit,Reg_Ctrl_BMS, BMS_DISCHARGING)
@@ -250,7 +252,7 @@ def run_sync_client():
     read_single_register(client, UNIT, Reg_Ctrl_BMS)
     print("Connection successfully opened")
     WaitVar = 0
-    RefVal = 10
+    RefVal = 0
  
     
     # ----------------------------------------------------------------------- #
@@ -268,12 +270,14 @@ def run_sync_client():
             write_single_register(client, UNIT, Reg_P_ref, RefVal)
             if RefVal < 1000:
                 RefVal += 50
+            # RefVal = 1000
             WaitVar = time.time()
     # ----------------------------------------------------------------------- #
     # close the client
     # ----------------------------------------------------------------------- #
     print("Closing connection to BMS server")
     write_single_register(client, UNIT, Reg_Load_Ref, 0)
+    write_single_register(client, UNIT, Reg_P_ref, 0)
     client.close()
     print("Connection successfully closed")
     return datalist
@@ -289,7 +293,7 @@ if __name__ == "__main__":
     dframe.plot(subplots = True, y = ["Reg_Stack_voltage","Reg_Stack_Current","Reg_P_ref","Reg_Load_Ref","Reg_Flow_Anolyte","Reg_AC_DC_GRID_POWER"])
     plt.show()
 
-    dframe.to_csv("BMS_LAB_TEST.csv")
+    dframe.to_csv("BMS_LAB_TEST_REFSTEPS_2.csv")
     
 
 #    test=easygui.ynbox('Run test?', 'Title', ('Yes', 'No'))

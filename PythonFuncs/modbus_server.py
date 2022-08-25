@@ -63,7 +63,7 @@ def randvalue(minrange, maxrange):
 def Read_Ctrl_BMS          (Value):
     return int15(active_BMS.get_BMS_state());
 def Read_SOC               (Value):
-	return int15(active_BMS.get_battery_soc());
+    return int15(active_BMS.get_battery_soc());
 def Read_P_ref             (Value):
 	return int15(active_BMS.get_power_reference());
 def Read_GaussVolt         (Value):
@@ -402,6 +402,7 @@ def run_server():
     server = ModbusTcpServer(context, identity=identity, address=('0.0.0.0', 5020))
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
+    # reactor.run()
     loop = LoopingCall(f=updatevalues, a=server)
     loop.start(interval, now=True)
     print("")
@@ -413,5 +414,5 @@ def run_server():
 #!/usr/bin/python
 
 if __name__ == "__main__":
-    run_server()
+        run_server()
     
