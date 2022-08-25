@@ -166,6 +166,8 @@ def Read_CP_lo_est (self):
     return int15(int15(active_BMS.Cp) & 0x7fff)
 def Read_OCV_est   (self):
     return int15(active_BMS.OCV * 100);
+def Read_Load_Ref  (self):
+    return int15(active_BMS.battery.get_load_ref())
 
 
 read_function_switch_statement = {
@@ -218,7 +220,8 @@ read_function_switch_statement = {
     Reg_rp_est                  :Read_Rp_est, 
     Reg_cp_hi_est               :Read_Cp_hi_est,
     Reg_cp_lo_est               :Read_CP_lo_est,
-    Reg_ocv_est                 :Read_OCV_est
+    Reg_ocv_est                 :Read_OCV_est,
+    Reg_Load_Ref                :Read_Load_Ref
     };
 
         
@@ -321,6 +324,9 @@ class CustomDataBlock(ModbusSparseDataBlock):
             elif current_address ==  Reg_Time_contraction:
                 active_BMS.battery.set_speedup_factor(float (value[idx]))
                 print("wrote {} at {} (p_ref)".format(value[idx], address+idx))    
+            elif current_address == Reg_Load_Ref:
+                active_BMS.battery.set_load_ref(float (value[idx]))
+                print("wrote {} at {} (Load Reference)".format(value[idx], address+idx)) 
             else:
                 print("<wrote {} at {} >".format(value[idx], address+idx))
 

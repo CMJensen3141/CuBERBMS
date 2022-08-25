@@ -158,18 +158,28 @@ class Sensors(object):
     def __init__(self):
         self.SensorClient = mc_rtu.RTU_Client("COM3")
         self.SensorClient.connect_to_rtu_client()
-        
         self.BoardDict = BoardDict
-        # Values are TRUE if the board physically exists, otherwise false
+
+        
+        # BOARDS
+        # Values are TRUE if the board physically exists, otherwise FALSE.
         self.Board_1 = False
         self.Board_1_Dict = Board_1_Dict
         self.Board_2 = True
         self.Board_2_Dict = Board_2_Dict
         self.Board_3 = False
         self.Board_3_Dict = Board_3_Dict
-        # Values are TRUE if the sensor physically exists, otherwise FALSE
+        
+        # SENSORS
+        # Values are TRUE if the sensor physically exists, otherwise FALSE.
         self.Stack_Temp_Anolyte = True
         self.Stack_Temp_Catholyte = False
+        
+        # ACTUATORS
+        # Values are TRUE if the actuator physically exists, otherwise FALSE
+        self.Variable_Load = True
+        self.Variable_Load_Ref = 0
+        self.Variable_Load_Pending = False
         
         self.Board_1_Values = np.zeros([9,1])
         self.Board_2_Values = np.zeros([9,1])
@@ -177,15 +187,18 @@ class Sensors(object):
         
     def Read_Board(self,Board):
         if getattr(self,Board) == True :
-           rr = self.SensorClient.read_holding_registers(0,9,self.BoardDict[Board]) 
-           setattr(self, Board + "_Values", rr.registers)
+           rr = self.SensorClient.read_holding_registers(0,9,self.BoardDict[Board]) # Read all registers from the desired board
+           setattr(self, Board + "_Values", rr.registers) # Map read to storage register
         else: 
             print(Board + " does not exist")
         
     def Write_Board(self,Board,RegName,value):  
-        if getattr(self,Board) == True :
+        if getattr(self,Board) == True:
             dictvar = getattr(self,Board + "_Dict") # Figure out what the correct dictionary is for the given board
             wr = self.SensorClient.write_holding_registers(dictvar[RegName], value, self.BoardDict[Board]) # Write the desired value to the correct register on the board
+            rr = self.SensorClient.read_holding_registers(0,9,self.BoardDict[Board])
+            if rr.registers[8] != value:
+                return False
         else:
             print(Board + " does not exist or register does not exist on given board")
 
@@ -370,7 +383,18 @@ class Sim_battery(object):
         return(self.P_Cooling)
     def set_cooling(self,P_Cooling):
         self.P_Cooling = P_Cooling
-    
+    def get_load_ref(self):
+        if self.sensors.Variable_Load == True:
+            return(self.sensors.Board_2_Values[self.sensors.Board_2_Dict["ACTUATOR_VARIABLE_LOAD"]])
+        else:
+            return False
+    def set_load_ref(self,Ref):
+        if self.sensors.Variable_Load == True:
+            self.sensors.Variable_Load_Ref = Ref
+            self.sensors.Variable_Load_Pending = True
+        else:
+            print("Cannot set load reference as load is not mounted")
+
         
 class Sim_BMS(object):
     def __init__(self, ):
@@ -531,9 +555,13 @@ class Sim_BMS(object):
             
         for key in self.battery.sensors.BoardDict:
             if getattr(self.battery.sensors,key) == True: 
-                self.battery.sensors.Read_Board(key)
-        self.battery.sensors.Write_Board('Board_2','ACTUATOR_VARIABLE_LOAD',69)
-        # print("Stack temperature is " + str(self.battery.get_stack_temperature()))
+                self.battery.sensors.Read_Board(key)    # Read first
+                if self.battery.sensors.Variable_Load_Pending: # Then write
+                    self.battery.sensors.Write_Board("Board_2", "ACTUATOR_VARIABLE_LOAD", int(self.battery.sensors.Variable_Load_Ref))
+                    self.battery.sensors.Variable_Load_Pending = False
+                    
+        
+
         
         self.battery.update_stack_simulation(self.pump_positive.get_pump_duty(),
                                              self.pump_negative.get_pump_duty(),

@@ -235,18 +235,22 @@ def run_sync_client():
     print("Opening connection to Modbus client")
     UNIT = 0x1 # Logic unit number
     client.connect() # Connect to the modbus server
+    write_single_register(client, UNIT, Reg_Load_Ref, 0)
     # client.write_register(Reg_Ctrl_BMS, 1, unit=UNIT)
     # rr = client.read_holding_registers(Reg_Ctrl_BMS, 1, unit=UNIT)
     # print(rr.registers)
     SM = state_machine(client,UNIT) # Instantiate the state machine
     datalist = np.empty([HOLDING_REGISTER_COUNT,1],dtype = object)
     [status,arr] = read_multiple_registers(HOLDING_REGISTER_COUNT, client, UNIT)
+
     if status == True:
         datalist[:,0] = arr
     else:
         datalist = np.zeros(1,1)
     read_single_register(client, UNIT, Reg_Ctrl_BMS)
     print("Connection successfully opened")
+    WaitVar = 0
+    RefVal = 10
  
     
     # ----------------------------------------------------------------------- #
@@ -259,6 +263,11 @@ def run_sync_client():
         # time.sleep(1)
         [status,arr] = read_multiple_registers(HOLDING_REGISTER_COUNT, client, UNIT)
         datalist = np.append(datalist, arr.reshape(HOLDING_REGISTER_COUNT,1), axis=1)
+        WaitVar += 1
+        if WaitVar == 100:
+            write_single_register(client, UNIT, Reg_Load_Ref, RefVal)
+            RefVal += 10
+            WaitVar = 0
     # ----------------------------------------------------------------------- #
     # close the client
     # ----------------------------------------------------------------------- #
@@ -274,7 +283,7 @@ if __name__ == "__main__":
     data = data.T
     dframe = pd.DataFrame(data, columns = RegNames)
     
-    dframe.plot(subplots = True, y = ["Reg_Stack_voltage","Reg_Stack_Current","Reg_P_ref"])
+    dframe.plot(subplots = True, y = ["Reg_Stack_voltage","Reg_Stack_Current","Reg_P_ref","Reg_Load_Ref"])
     plt.show()
     
 

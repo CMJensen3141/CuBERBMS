@@ -57,10 +57,11 @@ Reg_rp_est                  = 146;
 Reg_cp_hi_est               = 147; # cp >> 15
 Reg_cp_lo_est               = 148; # cp & ox7fff
 Reg_ocv_est                 = 149; # ocv * 100
+Reg_Load_Ref                = 150; # Reference for variable
 
-HOLDING_REGISTERS           = 139;
+HOLDING_REGISTERS           = 140;
 HOLDING_REGISTER_START      = 99;
-HOLDING_REGISTER_END        = 149;
+HOLDING_REGISTER_END        = 151;
 HOLDING_REGISTER_MAX        = HOLDING_REGISTER_START + HOLDING_REGISTERS ;
 HOLDING_REGISTER_COUNT      = HOLDING_REGISTER_END - HOLDING_REGISTER_START -1;
 # HOLDING_REGISTER_COUNT = 44;
@@ -123,12 +124,13 @@ RegNames = ['Reg_Ctrl_BMS',
             'Reg_anolyte_pressure_out',
             'Reg_catholyte_pressure_out',
             'Reg_anolyte_temp_out',
-            'Reg_catholyte_temp_out'
+            'Reg_catholyte_temp_out',
             'Reg_rs_est',
             'Reg_rp_est',
             'Reg_cp_hi_est',
             'Reg_cp_lo_est',
-            'Reg_ocv_est']
+            'Reg_ocv_est',
+            'Reg_Load_Ref']
 
 #%% Sensor and board registers
 
