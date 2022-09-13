@@ -168,9 +168,9 @@ class Sensors(object):
         # Values are TRUE if the board physically exists, otherwise FALSE.
         self.Board_1 = False
         self.Board_1_Dict = Board_1_Dict
-        self.Board_2 = True
+        self.Board_2 = False
         self.Board_2_Dict = Board_2_Dict
-        self.Board_3 = True
+        self.Board_3 = False
         self.Board_3_Dict = Board_3_Dict
 
         if self.Board_1 == True or self.Board_2 == True or self.Board_3 == True:
@@ -182,11 +182,11 @@ class Sensors(object):
         self.Stack_Temp_Anolyte = False
         self.Stack_Temp_Catholyte = False
 
-        self.Flow_Anolyte = True
+        self.Flow_Anolyte = False
         
         # ACTUATORS
         # Values are TRUE if the actuator physically exists, otherwise FALSE
-        self.Variable_Load = True
+        self.Variable_Load = False
         self.Variable_Load_Ref = 0
         self.Variable_Load_Pending = False
         
@@ -318,8 +318,8 @@ class Sim_battery(object):
         self.sensors = Sensors()
         self.CombinedModel = ComMod.RFB_CombinedModel(self.dt, self.R_1, self.T_ambient, self.c_total)
         
-        self.SimStatus = False # Indicate whether we are simulating the battery dynamics
-        self.Inverter.set_sim_status(False) # Indicate whether inverter is simulated
+        self.SimStatus = True # Indicate whether we are simulating the battery dynamics
+        self.Inverter.set_sim_status(True) # Indicate whether inverter is simulated
 
     def update_stack_simulation(self,w_ano,w_cat,Icharge):
 
