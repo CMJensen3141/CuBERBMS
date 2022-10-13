@@ -85,7 +85,7 @@ def Read_Temp_anolyte_In   (Value):
     out = active_BMS.battery.CombinedModel.GetTemps()
     return int15(out[1]);            ###@TODO
 def Read_Flow_Anolyte      (Value):
-    return int15(active_BMS.battery.get_flowrate()) # Check that units are correct (currently l/s)
+    return int15(active_BMS.battery.CombinedModel.GetAnoFlows()) # Check that units are correct (currently l/s)
 def Read_Pressure_Anolyte  (Value):
     return int15(AtmPres-active_BMS.battery.CombinedModel.GetAnoPressure_Pump()); # Check that units are correct (currently mbar)
 def Read_Speed_Anolyte     (Value):
