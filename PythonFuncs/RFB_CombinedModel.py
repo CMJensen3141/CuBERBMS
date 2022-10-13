@@ -14,8 +14,9 @@ import numpy as np
 
 class RFB_CombinedModel:
     def __init__(self,Ts_ext,Rstack,T_ambient,c_total):
-        c_init_tanks = np.array([0,2500,2500,0],dtype = np.float64).reshape(4,1)
-        c_init_cell = np.array([0,0,0,0],dtype = np.float64).reshape(4,1)
+        c_init_tanks = np.array([2500,2500,0,0],dtype = np.float64).reshape(4,1)
+        # c_init_cell = np.array([0,0,0,0],dtype = np.float64).reshape(4,1)
+        c_init_cell = c_init_tanks
         
         self.EModel = ElectricModel.CuRFB_EC(c_init_tanks, c_init_cell, Ts_ext, 1)
         

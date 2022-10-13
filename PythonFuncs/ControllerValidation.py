@@ -76,13 +76,13 @@ for ii in range(0,simlen):
     c_tank[:,ii] = BatteryModel.GetTanksConc().flatten()
     c_cell[:,ii] = BatteryModel.GetCellsConc().flatten()
     
-    if SOC[0,ii] >= 0.99 and myBMS.Mode == 1:
+    if SOC[0,ii] >= 0.8 and myBMS.Mode == 1:
         RestTicker += 1
         if RestTicker > 600/Ts:
             RestTicker = 0
             myBMS.Mode = -1 # Set to discharge
             myBMS.setRefPower(-2500)
-    if SOC[0,ii] <= 0.01 and myBMS.Mode == -1:
+    if SOC[0,ii] <= 0.1 and myBMS.Mode == -1:
         RestTicker += 1
         if RestTicker > 600/Ts:
             RestTicker = 0
@@ -117,7 +117,7 @@ for ii in range(0,2):
     plt.plot(taxis,c_cell[ii,:].flatten())
 for ii in range(2,4):
     plt.plot(taxis,c_cell[ii,:].flatten(),'--')
-plt.legend(["C1 ano","C2 ano","C1 cat","C0 cat"])
+plt.legend(["C1 cat","C1 ano","C2 cat","C2 ano"])
 plt.ylabel("Cells [$mol/m^3$]",rotation=0, ha='right')
 plt.xlabel("Time [hr]")
 plt.subplot(3,1,3)
@@ -125,7 +125,7 @@ for ii in range(0,2):
     plt.plot(taxis,c_tank[ii,:].flatten())
 for ii in range(2,4):
     plt.plot(taxis,c_tank[ii,:].flatten(),'--')
-plt.legend(["C1 ano","C2 ano","C1 cat","C0 cat"])
+plt.legend(["C1 cat","C1 ano","C2 cat","C2 ano"])
 plt.ylabel("Tanks [$mol/m^3$]",rotation=0, ha='right')
 plt.xlabel("Time [hr]")
 

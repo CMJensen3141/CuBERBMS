@@ -397,7 +397,7 @@ def run_server():
     # to write to the block
     # store_1.setValues(0x0F, 0, [111, 121, 122, 123, 124])
 
-    interval = 1
+    interval = 0.05
 
     server = ModbusTcpServer(context, identity=identity, address=('0.0.0.0', 5020))
     t = threading.Thread(target=server.serve_forever, daemon=True)

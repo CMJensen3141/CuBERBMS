@@ -18,6 +18,7 @@ class CuRFB_EC:
     def __init__(self,c_init_tanks,c_init_cell,Ts_extern,Ts_intern):
         self.c_tank = c_init_tanks.reshape(4,1) # Initial reactant species concentrations in tanks
         self.c_cell = c_init_cell.reshape(4,1) # Initial reactant species concentration in cells
+        self.c_0 = 0
         self.V_cell = 9.5*10**-4 # Cell volume
         self.V_tank = 0.05 # Electrolyte tank volume
         self.N = 19 # Number of cells in the stack
@@ -26,11 +27,14 @@ class CuRFB_EC:
         self.R = 8.314 # Ideal gas constant
         self.S = 0.15 # Membrane surface area
         self.d = 1.27*10**-4 # Membrane thickness
-        self.k = np.array([8.768, 3.221, 6.825, 5.896])*10**-12 # Diffusion coefficients (Fick's Law)
-        self.alpha = np.array([[-self.k[0], 0, -self.k[2], -2*self.k[3],],[0, -self.k[1],2*self.k[2], 3*self.k[3]],[3*self.k[0], 2*self.k[1], -self.k[2], 0],[-2*self.k[0], -self.k[1], 0, -self.k[3]]],dtype = np.float64) # Species mass balance factors
+        self.k = np.array([8.768, 3.221, 6.825, 5.896])*10**-12 # Diffusion coefficients
+        self.k_d = 10**-10 # Discomprortionation reaction constant
+        # self.alpha = np.array([[-self.k[0], 0, -self.k[2], -2*self.k[3],],[0, -self.k[1],2*self.k[2], 3*self.k[3]],[3*self.k[0], 2*self.k[1], -self.k[2], 0],[-2*self.k[0], -self.k[1], 0, -self.k[3]]],dtype = np.float64) # Species mass balance factors
+        self.alpha = np.array([[-self.k[0], self.k[0], 2*self.k_d, 0,],[self.k[0], -self.k[0], 0, 0,],[0, 0, -(-self.k_d+self.k[1]), self.k[1],],[0, 0, self.k[1], -self.k[1],]],dtype = np.float64)
         self.Ts_extern = Ts_extern # Discretisation time of outer simulation loop
         self.Ts_intern = Ts_intern # Discretisation time of model proper
-        self.CurrentSigns = np.array([1,-1,-1,1]).reshape(4,1)
+        # self.CurrentSigns = np.array([1,-1,-1,1]).reshape(4,1)
+        self.CurrentSigns = np.array([-1, -1, 0, 1]).reshape(4,1)
         self.A = self.alpha
         # self.E0 = 0.7 # Formal potential [V] of copper
         self.E0 = 1.259 # Formal potential [V] of vanadium
@@ -55,15 +59,30 @@ class CuRFB_EC:
         
         @njit
         def NumbaTimestep(qa,qc,I,c_cell,c_tank):
-            Q = np.array([[qa, 0, 0, 0,],[0, qa, 0, 0],[0, 0, qc, 0],[0, 0, 0, qc]],dtype = np.float64)
+            Q = np.array([[qa, 0, 0, 0,],[0, qc, 0, 0],[0, 0, qa, 0],[0, 0, 0, qc]],dtype = np.float64)
             currentpart = 1/(z*F)*CurrentSigns*I
-            if (c_cell[0] + c_cell[1]) > 2500 or (c_cell[2] + c_cell[3]) > 2500: # If excessive concentration, rebalance
-                c_cell[0] = c_cell[0]/(c_cell[0]+c_cell[1])*2500
-                c_cell[1] = c_cell[1]/(c_cell[0]+c_cell[1])*2500
-                c_cell[2] = c_cell[2]/(c_cell[2]+c_cell[3])*2500
-                c_cell[3] = c_cell[3]/(c_cell[2]+c_cell[3])*2500
+            c0 = 5000-c_cell[0]-c_cell[1]-c_cell[2]-c_cell[3]
+            if I > 0:
+                if (c_cell[0] > 0) and (c_cell[1] > 0):
+                    currentpart = currentpart
+                else:
+                    currentpart = currentpart*0
+            elif I < 0:
+                if (c_cell[3] > 0) and (c0 > 0):
+                    currentpart = currentpart
+                else:
+                    currentpart = currentpart*0
+            
+            if c_cell[0] == 0 and c_cell[1] == 0 and c_cell[2] == 0 and c_cell[3] == 0:
+                currentpart = 0*currentpart
+            # if (c_cell[0] + c_cell[2]) > 2500 or (c_cell[1] + c_cell[3]) > 2500: # If excessive concentration, rebalance
+            #     c_cell[0] = c_cell[0]/(c_cell[0]+c_cell[2])*2500
+            #     c_cell[1] = c_cell[1]/(c_cell[0]+c_cell[2])*2500
+            #     c_cell[2] = c_cell[2]/(c_cell[1]+c_cell[3])*2500
+            #     c_cell[3] = c_cell[3]/(c_cell[1]+c_cell[3])*2500
             for ii in range(0,numsteps):
                 flowpart = Q@(c_tank-c_cell).reshape(4,1)
+                flowpart = flowpart
                 diffusionpart = S/d*A@c_cell.reshape(4,1)
                 c_cell += Ts_intern*(flowpart+currentpart+diffusionpart)/(2*V_cell) 
                 c_tank += Ts_intern*(N*Q@(c_cell-c_tank))/V_tank
@@ -78,8 +97,15 @@ class CuRFB_EC:
         return NumbaTimestep
         
     def GetSOC(self):
-        SOCvar = self.c_tank[0]/(self.c_tank[0]+self.c_tank[1])
+        # SOCvar = self.c_tank[1]/(self.c_tank[1]+self.c_tank[3])
+        SOCvar = self.c_tank[3]/(self.c_tank[1]+self.c_tank[3])
         return SOCvar
+    
+    def GetSOC_discharge(self):
+        SOCvar = self.c_tank[1]/(self.c_tank[1]+self.c_tank[3])
+        return SOCvar
+    
+    
      
     def GetCells(self):
          return self.c_cell
@@ -147,17 +173,20 @@ if __name__ == "__main__": # Unit tests, run only if executing this file as main
                 out = fooCU.NumbaStep(flow1, flow1, I_c, cellvals, tankvals)
             else:
                 out = fooCU.NumbaStep(flow1, flow1, 0, cellvals, tankvals)
+            SOCbat[:,ii] = fooCU.GetSOC()
         else:
             if SOCbat[:,ii-1] > -0.5:
                 out = fooCU.NumbaStep(flow2, flow2, I_d, cellvals, tankvals)
             else:
                 out = fooCU.NumbaStep(flow2, flow2, 0, cellvals, tankvals)
+            SOCbat[:,ii] = fooCU.GetSOC_discharge()
+        
         fooCU.SetCells(out[0])
         fooCU.SetTanks(out[1])
         c_tank[:,ii] = fooCU.GetTanks().flatten()
         c_cell[:,ii] = fooCU.GetCells().flatten()
         Vbat[:,ii] = fooCU.GetVoltage(25)*fooCU.N
-        SOCbat[:,ii] = fooCU.GetSOC()
+
     
         
         
